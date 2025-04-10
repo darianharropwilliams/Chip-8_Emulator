@@ -4,7 +4,7 @@
 #include "chip8.h"
 
 // Main opcode handlers (mapped in main_table[0x0 - 0xF])
-void op_0xxx(Chip8 *chip8, uint16_t opcode);
+void op_0xxx(Chip8 *chip8, uint16_t opcode); // Requires subdispatching
 void op_1nnn(Chip8 *chip8, uint16_t opcode);
 void op_2nnn(Chip8 *chip8, uint16_t opcode);
 void op_3xkk(Chip8 *chip8, uint16_t opcode);
@@ -12,14 +12,14 @@ void op_4xkk(Chip8 *chip8, uint16_t opcode);
 void op_5xy0(Chip8 *chip8, uint16_t opcode);
 void op_6xkk(Chip8 *chip8, uint16_t opcode);
 void op_7xkk(Chip8 *chip8, uint16_t opcode);
-void op_8xxx(Chip8 *chip8, uint16_t opcode);
+void op_8xxx(Chip8 *chip8, uint16_t opcode); // Requires subdipatching
 void op_9xy0(Chip8 *chip8, uint16_t opcode);
 void op_Annn(Chip8 *chip8, uint16_t opcode);
 void op_Bnnn(Chip8 *chip8, uint16_t opcode);
 void op_Cxkk(Chip8 *chip8, uint16_t opcode);
 void op_Dxyn(Chip8 *chip8, uint16_t opcode);
-void op_Exxx(Chip8 *chip8, uint16_t opcode);
-void op_Fxxx(Chip8 *chip8, uint16_t opcode);
+void op_Exxx(Chip8 *chip8, uint16_t opcode); // Requires subdispatching
+void op_Fxxx(Chip8 *chip8, uint16_t opcode); // Requires subdispatching
 
 // Subtable handlers (called by op_0xxx, op_8xxx, etc.)
 void op_00E0(Chip8 *chip8, uint16_t opcode);

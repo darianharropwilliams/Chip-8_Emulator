@@ -14,6 +14,7 @@ This project is a modular and extensible CHIP-8 emulator written in C, built wit
 ├── utils.h         # ROM loading, memory utilities, debugging
 ```
 
+
 ## Architecture Overview
 
 ### Core: `chip8.h`
@@ -39,8 +40,24 @@ Fetches, decodes, and dispatches opcodes using the dispatch table defined in `di
 ### `dispatch_opcode`
 Uses a function pointer table (`OpcodeHandler`) to quickly decode and route opcodes to the correct handler function based on the high nibble (e.g., `0x1NNN`, `0x6XKK`).
 
-### Subtables
-Special cases (e.g., `0x00E0`, `0x8XYE`, `0xEX9E`, `0xFX65`) are further delegated to sub-dispatch functions within handlers like `op_0xxx`, `op_8xxx`, etc.
+### Dispatch Table Design
+
+The dispatch logic is organized into a two-layer system:
+
+#### 1. `main_table[0x10]`
+- Top-level dispatch table with 16 entries.
+- Indexed using the high nibble of the 2-byte opcode: `(opcode >> 12) & 0xF`
+- Routes to general handler groups like `op_0xxx`, `op_1nnn`, ..., `op_Fxxx`
+
+#### 2. Subtables (for ambiguous families)
+Some opcode groups have multiple variants that require further decoding based on bits beyond the first nibble. These are:
+
+- `table_0[0x100]`: Handles `0x00E0`, `0x00EE`
+- `table_8[0x10]`: Handles `0x8xy0` through `0x8xyE` (register ops)
+- `table_E[0x100]`: Handles `0xEx9E`, `0xExA1` (key skips)
+- `table_F[0x100]`: Handles instructions like `Fx07`, `Fx0A`, ..., `Fx65` (timers, memory, input)
+
+Each of these subtables is used within its corresponding high-nibble handler. For example, `op_8xxx` indexes `table_8[opcode & 0x000F]`.
 
 ### Benefits
 - Fast opcode routing with minimal branching
@@ -79,8 +96,7 @@ Special cases (e.g., `0x00E0`, `0x8XYE`, `0xEX9E`, `0xFX65`) are further delegat
 ---
 
 ## Coming Next
-- Implement `opcode_dispatch_init()` and fill the dispatch/sub-dispatch tables.
-- Build out opcode logic in `opcodes.c`.
+- Finish `opcodes.c` functions that implement logic for each opcode.
 - Add SDL2 or other backend for visual/audio output and key input.
 
 ---

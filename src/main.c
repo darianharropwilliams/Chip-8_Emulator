@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
     chip8_init(&chip8);
 
     // Load ROM
-    if (chip8_load_rom(&chip8, argv[1]) != 0) {
+    if (chip8_load_rom(&chip8, argv[1])) { // Function returns 0 (false) if successful
         fprintf(stderr, "Failed to load ROM: %s\n", argv[1]);
         return EXIT_FAILURE;
     }
@@ -27,21 +27,21 @@ int main(int argc, char *argv[]) {
     while (1) {
         clock_t start = clock();
 
-        // Run a few cycles per frame
+        // Run designated cycles per frame
         for (int i = 0; i < CYCLES_PER_FRAME; i++) {
-            chip8_cycle(&chip8);
+            chip8_cycle(&chip8); // Errors handled inside chip8_cycle()
         }
 
         // Optional: add delay to simulate 60Hz
         clock_t end = clock();
-        int elapsed_ms = (int)((end - start) * 1000 / CLOCKS_PER_SEC);
+        int elapsed_ms = (int)((end - start) * 1000 / CLOCKS_PER_SEC); // Calculate time spent
         if (elapsed_ms < FRAME_DELAY_MS) {
             // Sleep the remaining time (not precise)
             struct timespec ts = {
                 .tv_sec = 0,
                 .tv_nsec = (FRAME_DELAY_MS - elapsed_ms) * 1000000
             };
-            nanosleep(&ts, NULL);
+            nanosleep(&ts, NULL); // Maintain consistent FPS
         }
 
         // Optional: print registers for debugging
