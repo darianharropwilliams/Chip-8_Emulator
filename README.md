@@ -5,99 +5,115 @@ This project is a modular and extensible CHIP-8 emulator written in C, built wit
 ## Project Structure
 
 ```
-├── chip8.h         # Core emulator state and high-level control
-├── dispatch.h      # Opcode dispatch mechanism (main + subtables)
-├── opcodes.h       # Opcode handler function declarations
-├── display.h       # Monochrome display emulation (64x32)
-├── input.h         # Keypad handling (16-key HEX)
-├── timer.h         # Delay and sound timers (60Hz decrement)
-├── utils.h         # ROM loading, memory utilities, debugging
+├── include/
+│   ├── chip8.h         # Core emulator state and control
+│   ├── dispatch.h      # Opcode dispatch mechanism (main + subtables)
+│   ├── opcodes.h       # Opcode handler function declarations
+│   ├── display.h       # Monochrome display emulation (64x32)
+│   ├── input.h         # Keypad handling (16-key HEX)
+│   ├── timer.h         # Delay and sound timers (60Hz decrement)
+│   └── utils.h         # ROM loading, memory utilities, debugging
+│
+├── src/
+│   ├── chip8.c         # Core VM implementation
+│   ├── dispatch.c      # Main and subdispatch tables
+│   ├── opcodes.c       # Fully implemented CHIP-8 opcode set
+│   ├── display.c       # (Stubbed) TODO
+│   ├── input.c         # (Stubbed) TODO
+│   ├── timer.c         # TODO
+│   ├── utils.c         # TODO
+│   └── main.c          # TODO
 ```
 
+---
 
 ## Architecture Overview
 
 ### Core: `chip8.h`
-Defines the `Chip8` struct representing the full state of the virtual machine, including:
-
-- Memory (`4K`)
-- General purpose registers (`V0`–`VF`)
-- Index register `I`
-- Program counter `pc`
-- Stack and stack pointer
-- Timers: `delay_timer` and `sound_timer`
-- Display buffer
-- Keypad state array
-- A `draw_flag` to indicate screen updates
+Defines the `Chip8` struct representing full VM state:
+- Memory (4K)
+- Registers `V0`–`VF`, index register `I`, and PC
+- Stack (16x 16-bit) + stack pointer
+- Delay & sound timers (60Hz)
+- Monochrome display buffer (64×32)
+- 16-key keypad
+- `draw_flag` used to signal screen updates
 
 ### Execution Cycle: `chip8_cycle`
-Fetches, decodes, and dispatches opcodes using the dispatch table defined in `dispatch.h`.
+Performs one emulation cycle:
+1. Fetches opcode from memory
+2. Advances program counter
+3. Dispatches opcode
+4. Updates timers
+5. Polls input
+6. Redraws display if needed
 
 ---
 
-## Dispatch Table: `dispatch.h` + `opcodes.h`
+## Opcode Dispatch System
 
-### `dispatch_opcode`
-Uses a function pointer table (`OpcodeHandler`) to quickly decode and route opcodes to the correct handler function based on the high nibble (e.g., `0x1NNN`, `0x6XKK`).
+### Files: `dispatch.h/.c` + `opcodes.h/.c`
 
-### Dispatch Table Design
+The dispatch mechanism uses a layered table-based system for speed and clarity:
 
-The dispatch logic is organized into a two-layer system:
+#### `main_table[16]`
+- Dispatches based on the high nibble (e.g., `0x1NNN`, `0x6XKK`)
+- Routes to functions like `op_1nnn`, `op_8xxx`, `op_Fxxx`
 
-#### 1. `main_table[0x10]`
-- Top-level dispatch table with 16 entries.
-- Indexed using the high nibble of the 2-byte opcode: `(opcode >> 12) & 0xF`
-- Routes to general handler groups like `op_0xxx`, `op_1nnn`, ..., `op_Fxxx`
+#### Subdispatch Tables
+- `table_0[256]`: Handles `0x00E0`, `0x00EE`
+- `table_8[16]`: Handles arithmetic/bitwise ops `8xy0` to `8xyE`
+- `table_E[256]`: Keypad skip instructions (`EX9E`, `EXA1`)
+- `table_F[256]`: Timer/memory/input instructions like `FX07`, `FX55`, etc.
 
-#### 2. Subtables (for ambiguous families)
-Some opcode groups have multiple variants that require further decoding based on bits beyond the first nibble. These are:
-
-- `table_0[0x100]`: Handles `0x00E0`, `0x00EE`
-- `table_8[0x10]`: Handles `0x8xy0` through `0x8xyE` (register ops)
-- `table_E[0x100]`: Handles `0xEx9E`, `0xExA1` (key skips)
-- `table_F[0x100]`: Handles instructions like `Fx07`, `Fx0A`, ..., `Fx65` (timers, memory, input)
-
-Each of these subtables is used within its corresponding high-nibble handler. For example, `op_8xxx` indexes `table_8[opcode & 0x000F]`.
+Each top-level handler (like `op_8xxx`) calls its subtable based on lower opcode bits.
 
 ### Benefits
-- Fast opcode routing with minimal branching
-- Easy to extend or debug
-- Clean separation between opcode categories
+- Fast: Constant-time dispatch via table lookups
+- Modular: Easy to debug or extend individual opcode categories
+- Clean: Keeps core logic readable and separated
 
 ---
 
-## Display: `display.h`
-- Emulates a 64x32 monochrome display.
-- Sprites are drawn 8 bits wide and up to 15 pixels tall.
-- Handles XOR drawing and collision detection.
-- Includes a `draw_flag` to signal the need for redraw.
+## Display Module: `display.c`
+- Currently stubbed
+- Will render `chip8->display[]` buffer (64x32) to an SDL2 window
+- Uses XOR-based sprite drawing with collision detection
+- Clears display and tracks redraws via `chip8->draw_flag`
 
 ---
 
-## Input: `input.h`
-- Handles a 16-key hexadecimal keypad.
-- Scanning, key mapping, and state queries are encapsulated.
-- Used to implement instructions like `EX9E` and `FX0A`.
+## Input Module: `input.c`
+- Currently stubbed
+- Will map host keyboard input to CHIP-8's 16-key hex keypad
+- Includes polling, key state mapping, and key state checks
 
 ---
 
-## Timers: `timer.h`
-- `delay_timer` and `sound_timer` decrement at 60Hz.
-- Accessible and settable via `FX15`, `FX18`, `FX07`, etc.
+## Timers: `timer.c`
+- Manages delay and sound timers (`delay_timer`, `sound_timer`)
+- Decrements at 60Hz
+- Supports reading and setting from opcodes
 
 ---
 
-## Utilities: `utils.h`
-- ROM loading
-- Memory operations
-- Byte-swapping helper
-- Debug tools for printing register state
+## Utilities: `utils.c`
+- Loads ROMs into memory starting at 0x200
+- Swaps bytes and prints VM state (for debugging)
 
 ---
 
-## Coming Next
-- Finish `opcodes.c` functions that implement logic for each opcode.
-- Add SDL2 or other backend for visual/audio output and key input.
+## Status: Core Emulation Complete ✅
+
+**Fully implemented:**
+- Memory, registers, and instruction decoding
+- 35 standard CHIP-8 opcodes
+- Stack, keypad logic, timers, display buffer updates
+
+**Pending:**
+- SDL2 graphics rendering (64x32 scaled window)
+- SDL2 input mapping to CHIP-8 keypad
+- Audio (for sound timer, optional)
 
 ---
 

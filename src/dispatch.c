@@ -109,3 +109,36 @@ void dispatch_opcode(Chip8 *chip8, uint16_t opcode) {
     else
         fprintf(stderr, "Unknown Opcode: 0x%04X\n", opcode);
 }
+
+
+// === 0xxx: SYS / CLS / RET ===
+/**
+ * 0nnn - SYS addr
+ * Jump to a machine code routine at nnn.
+ * 
+ * This instruction is only used on the old computers on which Chip-8 was
+ * originally implemented. It is ignored by modern interpreters.
+ */
+static void op_0xxx(Chip8 *chip8, uint16_t opcode) {
+    OpcodeHandler handler = table_0[opcode & 0x00FF];
+    if (handler) handler(chip8, opcode);
+    else /* SYS nnn - ignored */ ;
+}
+
+// === 8xxx Group (bitwise, arithmetic, etc.) ===
+static void op_8xxx(Chip8 *chip8, uint16_t opcode) {
+    OpcodeHandler handler = table_8[opcode & 0x000F];
+    if (handler) handler(chip8, opcode);
+}
+
+// === Exxx: Keypad skip instructions ===
+static void op_Exxx(Chip8 *chip8, uint16_t opcode) {
+    OpcodeHandler handler = table_E[opcode & 0x00FF];
+    if (handler) handler(chip8, opcode);
+}
+
+// === Fxxx: Timer, memory, input instructions ===
+static void op_Fxxx(Chip8 *chip8, uint16_t opcode) {
+    OpcodeHandler handler = table_F[opcode & 0x00FF];
+    if (handler) handler(chip8, opcode);
+}

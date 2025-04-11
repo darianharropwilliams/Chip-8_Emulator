@@ -1,6 +1,7 @@
 {
     "files.associations": {
         ".fantomasignore": "ignore",
-        "chip8.h": "c"
+        "chip8.h": "c",
+        "compare": "c"
     }
 }
