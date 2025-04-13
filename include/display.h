@@ -16,4 +16,5 @@ void clear_display(Chip8 *chip8);
 // Update the display (trigger redrawing if needed)
 void update_display(Chip8 *chip8);
 
+void display_quit();
 #endif

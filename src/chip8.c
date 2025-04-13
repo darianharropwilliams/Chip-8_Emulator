@@ -74,6 +74,16 @@ int chip8_load_rom(Chip8 *chip8, const char *filename) {
 // ----------------------------------------------------------
 void chip8_cycle(Chip8 *chip8) {
     
+    if (!chip8) {
+        fprintf(stderr, "chip8_cycle called on null Chip8 pointer\n");
+        return;
+    }
+
+    if (chip8->pc >= MEMORY_SIZE - 1) {
+        fprintf(stderr, "PC out of bounds: 0x%04X\n", chip8->pc);
+        return;
+    }
+    
     // Fetch opcode: combine two bytes from memory at PC and PC+1
     uint16_t opcode = (chip8->memory[chip8->pc] << 8) | chip8->memory[chip8->pc + 1];
 
@@ -81,8 +91,10 @@ void chip8_cycle(Chip8 *chip8) {
     chip8->pc += 2;
     
     // Dispatch the opcode using the dispatch_opcode function
-    dispatch_opcode(chip8, opcode);
-
+    if (!dispatch_opcode(chip8, opcode)) {
+        fprintf(stderr, "Registers after unknown opcode:\n");
+        print_registers(chip8->V, chip8->I, chip8->pc, chip8->delay_timer, chip8->sound_timer);
+    }
     // Update delay and sound timers (60Hz)
     timer_update(chip8);    
     

@@ -5,8 +5,12 @@
 #include "utils.h"
 #include <stdlib.h>
 #include <stdio.h>
-// Type alias for an opcode handler function
-typedef void (*OpcodeHandler)(Chip8 *chip8, uint16_t opcode);
+
+#define OPCODE_NNN(op) ((op) & 0x0FFF)
+#define OPCODE_X(op) (((op) >> 8) & 0x0F)
+#define OPCODE_Y(op) (((op) >> 4) & 0x0F)
+#define OPCODE_N(op) ((op) & 0x000F)
+#define OPCODE_KK(op) ((op) & 0x00FF)
 
 
 /**
@@ -47,7 +51,7 @@ void op_00EE(Chip8 *chip8, uint16_t opcode) {
  */
 void op_1nnn(Chip8 *chip8, uint16_t opcode) {
 
-    uint16_t address = opcode & 0x0FFF;
+    uint16_t address = OPCODE_NNN(opcode);
     chip8->pc = address;
 
 }
@@ -61,14 +65,13 @@ void op_1nnn(Chip8 *chip8, uint16_t opcode) {
  */
 void op_2nnn(Chip8 *chip8, uint16_t opcode) {
     
-    uint16_t address = opcode & 0x0FFF;
-
-    chip8->stack[chip8->sp] = chip8->pc;
-    chip8->sp++;
+    uint16_t address = OPCODE_NNN(opcode);
     if (chip8->sp >= STACK_SIZE) {
         fprintf(stderr, "Stack overflow on CALL\n");
         return;
     }    
+    chip8->stack[chip8->sp] = chip8->pc;
+    chip8->sp++;
     chip8->pc = address;
 
 }
@@ -81,8 +84,8 @@ void op_2nnn(Chip8 *chip8, uint16_t opcode) {
  * increments the program counter by 2.
  */
 void op_3xkk(Chip8 *chip8, uint16_t opcode) {
-    uint8_t byte = opcode & 0x00FF;
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t byte = OPCODE_KK(opcode);
     if (chip8->V[Vx] == byte) {
         chip8->pc += 2;
     }
@@ -97,8 +100,8 @@ void op_3xkk(Chip8 *chip8, uint16_t opcode) {
  */
 void op_4xkk(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t byte = opcode & 0x00FF;
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t byte = OPCODE_KK(opcode);
+    uint8_t Vx = OPCODE_X(opcode);
     if (chip8->V[Vx] != byte) {
         chip8->pc += 2;
     }
@@ -114,8 +117,8 @@ void op_4xkk(Chip8 *chip8, uint16_t opcode) {
  */
 void op_5xy0(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
-    uint8_t Vy = (opcode & 0x00F0) >> 4;
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t Vy = OPCODE_Y(opcode);
     if (chip8->V[Vx] == chip8->V[Vy]) {
         chip8->pc += 2;
     }
@@ -129,8 +132,8 @@ void op_5xy0(Chip8 *chip8, uint16_t opcode) {
  * The interpreter puts the value kk into register Vx.
  */
 void op_6xkk(Chip8 *chip8, uint16_t opcode) {
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
-    uint8_t byte = (opcode & 0x00FF);
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t byte = OPCODE_KK(opcode);
 
     chip8->V[Vx] = byte;
 }
@@ -143,8 +146,8 @@ void op_6xkk(Chip8 *chip8, uint16_t opcode) {
  * in Vx.
  */
 void op_7xkk(Chip8 *chip8, uint16_t opcode) {
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
-    uint8_t byte = (opcode & 0x00FF);
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t byte = OPCODE_KK(opcode);
 
     uint8_t result = chip8->V[Vx] + byte;
 
@@ -168,8 +171,8 @@ void op_7xkk(Chip8 *chip8, uint16_t opcode) {
  */
 void op_8xy0(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
-    uint8_t Vy = (opcode & 0x00F0) >> 4;
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t Vy = OPCODE_Y(opcode);
 
     chip8->V[Vx] = chip8->V[Vy];
 
@@ -186,8 +189,8 @@ void op_8xy0(Chip8 *chip8, uint16_t opcode) {
  */
 void op_8xy1(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
-    uint8_t Vy = (opcode & 0x00F0) >> 4;
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t Vy = OPCODE_Y(opcode);
 
     chip8->V[Vx] |= chip8->V[Vy];
 
@@ -204,8 +207,8 @@ void op_8xy1(Chip8 *chip8, uint16_t opcode) {
  */
 void op_8xy2(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
-    uint8_t Vy = (opcode & 0x00F0) >> 4;
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t Vy = OPCODE_Y(opcode);
 
     chip8->V[Vx] &= chip8->V[Vy];
 
@@ -222,8 +225,8 @@ void op_8xy2(Chip8 *chip8, uint16_t opcode) {
  */
 void op_8xy3(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
-    uint8_t Vy = (opcode & 0x00F0) >> 4;
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t Vy = OPCODE_Y(opcode);
 
     chip8->V[Vx] ^= chip8->V[Vy];
 
@@ -239,8 +242,8 @@ void op_8xy3(Chip8 *chip8, uint16_t opcode) {
  */
 void op_8xy4(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
-    uint8_t Vy = (opcode & 0x00F0) >> 4;
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t Vy = OPCODE_Y(opcode);
 
     uint16_t result = chip8->V[Vx] + chip8->V[Vy];
 
@@ -259,9 +262,8 @@ void op_8xy4(Chip8 *chip8, uint16_t opcode) {
  */
 void op_8xy5(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
-    uint8_t Vy = (opcode & 0x00F0) >> 4;
-
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t Vy = OPCODE_Y(opcode);
     chip8->V[0xF] = (chip8->V[Vx] > chip8->V[Vy]);
     chip8->V[Vx] -= chip8->V[Vy];
 
@@ -275,7 +277,8 @@ void op_8xy5(Chip8 *chip8, uint16_t opcode) {
  * is divided by 2.
  */
 void op_8xy6(Chip8 *chip8, uint16_t opcode) {
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
+    // uint8_t Vy = OPCODE_Y(opcode);
 
     chip8->V[0xF] = chip8->V[Vx] & 0x1;
     chip8->V[Vx] >>= 1;
@@ -289,8 +292,8 @@ void op_8xy6(Chip8 *chip8, uint16_t opcode) {
  * the results stored in Vx.
  */
 void op_8xy7(Chip8 *chip8, uint16_t opcode) {
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
-    uint8_t Vy = (opcode & 0x00F0) >> 4;
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t Vy = OPCODE_Y(opcode);
 
     chip8->V[0xF] = chip8->V[Vy] > chip8->V[Vx];
     chip8->V[Vx] = chip8->V[Vy] - chip8->V[Vx];
@@ -305,7 +308,8 @@ void op_8xy7(Chip8 *chip8, uint16_t opcode) {
  * Vx is multiplied by 2.
  */
 void op_8xyE(Chip8 *chip8, uint16_t opcode) {
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
+    // uint8_t Vy = OPCODE_Y(opcode);
     chip8->V[0xF] = (chip8->V[Vx] & 0x80) >> 7;
     chip8->V[Vx] <<= 1;
 }
@@ -320,8 +324,8 @@ void op_8xyE(Chip8 *chip8, uint16_t opcode) {
  */
 void op_9xy0(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
-    uint8_t Vy = (opcode &0x00F0) >> 4;
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t Vy = OPCODE_Y(opcode);
 
     if (chip8->V[Vx] != chip8->V[Vy])
         chip8->pc += 2;
@@ -336,7 +340,8 @@ void op_9xy0(Chip8 *chip8, uint16_t opcode) {
  */
 void op_Annn(Chip8 *chip8, uint16_t opcode) {
 
-    uint16_t address = opcode & 0x0FFF;
+    uint16_t address = OPCODE_NNN(opcode);
+
     chip8->I = address;
 }
 
@@ -348,7 +353,7 @@ void op_Annn(Chip8 *chip8, uint16_t opcode) {
  */
 void op_Bnnn(Chip8 *chip8, uint16_t opcode) {
 
-    uint16_t address = opcode & 0x0FFF;
+    uint16_t address = OPCODE_NNN(opcode);
     chip8->pc = address + chip8->V[0x0];
 }
 
@@ -362,8 +367,8 @@ void op_Bnnn(Chip8 *chip8, uint16_t opcode) {
  */
 void op_Cxkk(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
-    uint8_t kk = opcode & 0x00FF;
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t kk = OPCODE_KK(opcode);
 
     uint8_t random = rand() % 256;
 
@@ -383,9 +388,9 @@ void op_Cxkk(Chip8 *chip8, uint16_t opcode) {
  * Display, for more information on the Chip-8 screen and sprites.
  */
 void op_Dxyn(Chip8 *chip8, uint16_t opcode) {
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
-    uint8_t Vy = (opcode & 0x00F0) >> 4;
-    uint8_t n = (opcode & 0x000F);
+    uint8_t Vx = OPCODE_X(opcode);
+    uint8_t Vy = OPCODE_Y(opcode);
+    uint8_t n = OPCODE_N(opcode);
 
     uint8_t x = chip8->V[Vx];
     uint8_t y = chip8->V[Vy];
@@ -406,7 +411,7 @@ void op_Dxyn(Chip8 *chip8, uint16_t opcode) {
  */
 void op_Ex9E(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
     uint8_t key = chip8->V[Vx];
 
     if (is_key_pressed(chip8, key))
@@ -422,7 +427,7 @@ void op_Ex9E(Chip8 *chip8, uint16_t opcode) {
  */
 void op_ExA1(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
     uint8_t key = chip8->V[Vx];
 
     if (!is_key_pressed(chip8, key)) 
@@ -441,7 +446,7 @@ void op_ExA1(Chip8 *chip8, uint16_t opcode) {
  */
 void op_Fx07(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
 
     chip8->V[Vx] = chip8->delay_timer;
 }
@@ -453,20 +458,24 @@ void op_Fx07(Chip8 *chip8, uint16_t opcode) {
  * All execution stops until a key is pressed, then the value of that key is stored in Vx.
  */
 void op_Fx0A(Chip8 *chip8, uint16_t opcode) {
-
-
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
 
     for (uint8_t key = 0; key < KEYPAD_SIZE; ++key) {
         if (chip8->keypad[key]) {
+            if (key >= KEYPAD_SIZE) {
+                fprintf(stderr, "Fx0A: Key index out of range: %u\n", key);
+                return;
+            }
+
             chip8->V[Vx] = key;
-            return;  // Continue to next instruction normally
+            return;
         }
     }
 
     // No key pressed: repeat this instruction by not advancing pc
     chip8->pc -= 2;
 }
+
 
 /**
  * Fx15 - LD DT, Vx
@@ -476,7 +485,7 @@ void op_Fx0A(Chip8 *chip8, uint16_t opcode) {
  */
 void op_Fx15(Chip8 *chip8, uint16_t opcode) {
     
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
 
     chip8->delay_timer = chip8->V[Vx];
 }
@@ -490,7 +499,7 @@ void op_Fx15(Chip8 *chip8, uint16_t opcode) {
  */
 void op_Fx18(Chip8 *chip8, uint16_t opcode) {
 
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
 
     chip8->sound_timer = chip8->V[Vx];
 }
@@ -501,7 +510,7 @@ void op_Fx18(Chip8 *chip8, uint16_t opcode) {
  * The values of I and Vx are added, and the results are stored in I.
  */
 void op_Fx1E(Chip8 *chip8, uint16_t opcode) {
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
 
     chip8->I = (chip8->I + chip8->V[Vx]) & 0xFFFF; // though I is 16-bit anyway
 
@@ -516,9 +525,14 @@ void op_Fx1E(Chip8 *chip8, uint16_t opcode) {
  * font.
  */
 void op_Fx29(Chip8 *chip8, uint16_t opcode) {
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
 
     uint8_t digit = chip8->V[Vx];
+
+    if (digit > 0xF) {
+        fprintf(stderr, "Invalid font digit in Fx29: Vx=0x%X, value=0x%X\n", Vx, digit);
+        return;
+    }    
 
     // Each digit sprite is 5 bytes starting from 0x000
     chip8->I = digit * 5;
@@ -534,8 +548,14 @@ void op_Fx29(Chip8 *chip8, uint16_t opcode) {
  * location I+2.
  */
 void op_Fx33(Chip8 *chip8, uint16_t opcode) {
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
     uint8_t value = chip8->V[Vx];
+
+    if (chip8->I + 2 >= MEMORY_SIZE) {
+        fprintf(stderr, "Memory overflow: I=0x%03X, Vx=0x%X (opcode: 0x%04X)\n", chip8->I, Vx, opcode);
+        return;
+    }
+    
 
     chip8->memory[chip8->I] = value / 100;
     chip8->memory[chip8->I + 1] = (value / 10) % 10;
@@ -550,8 +570,13 @@ void op_Fx33(Chip8 *chip8, uint16_t opcode) {
  * the address in I.
  */
 void op_Fx55(Chip8 *chip8, uint16_t opcode) {
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
 
+    if (chip8->I + Vx >= MEMORY_SIZE) {
+        fprintf(stderr, "Memory overflow: I=0x%03X, Vx=0x%X (opcode: 0x%04X)\n", chip8->I, Vx, opcode);
+        return;
+    }
+    
     for (int i = 0; i <= Vx; i++)
         chip8->memory[chip8->I + i] = chip8->V[i]; 
 
@@ -565,7 +590,12 @@ void op_Fx55(Chip8 *chip8, uint16_t opcode) {
  * through Vx.
  */
 void op_Fx65(Chip8 *chip8, uint16_t opcode) {
-    uint8_t Vx = (opcode & 0x0F00) >> 8;
+    uint8_t Vx = OPCODE_X(opcode);
+
+    if (chip8->I + Vx >= MEMORY_SIZE) {
+        fprintf(stderr, "Memory overflow: I=0x%03X, Vx=0x%X (opcode: 0x%04X)\n", chip8->I, Vx, opcode);
+        return;
+    }    
 
     for (int i = 0; i <= Vx; i++)
         chip8->V[i] = chip8->memory[chip8->I + i];

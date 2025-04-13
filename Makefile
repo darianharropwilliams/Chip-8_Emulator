@@ -40,3 +40,7 @@ run: $(EXEC)
 
 # Test the Makefile with a dummy target
 .PHONY: all clean rebuild run
+
+all: $(EXEC)
+	# Copy SDL2.dll to output directory
+	cp ./lib/SDL2-2.28.5/x86_64-w64-mingw32/bin/SDL2.dll $(BINDIR)/

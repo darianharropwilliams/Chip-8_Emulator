@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Build CHIP-8",
+        "type": "shell",
+        "command": "gcc",
+        "args": [
+          "-IC:\\${workspaceFolder}\\lib\\SDL2-2.28.5\\include",
+          "-LC:\\${workspaceFolder}\\lib\\SDL2-2.28.5\\lib",
+          "-lSDL2",
+          "-lSDL2main",
+          "${workspaceFolder}\\src\\*.c",
+          "-o",
+          "${workspaceFolder}\\chip8.exe"
+        ],
+        "group": "build",
+        "problemMatcher": ["$gcc"]
+      }
+    ]
+  }
+  

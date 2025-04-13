@@ -98,16 +98,27 @@ void opcode_dispatch_init(void) {
 // - Call the handler function with (chip8, opcode)
 // - Print/log unhandled opcodes for debugging
 // ----------------------------------------------------------
-void dispatch_opcode(Chip8 *chip8, uint16_t opcode) {
+bool dispatch_opcode(Chip8 *chip8, uint16_t opcode) {
+
+    if (!chip8) {
+        fprintf(stderr, "dispatch called on null Chip8 pointer\n");
+        return false;
+    }
+
 
     uint8_t prefix = (opcode >> 12) & 0xF;
     OpcodeHandler opcode_function = main_table[prefix];
 
-    if (opcode_function != NULL)
+    if (opcode_function != NULL) {
         opcode_function(chip8, opcode);
-    
-    else
+        return true;
+    }
+
+        
+    else {
         fprintf(stderr, "Unknown Opcode: 0x%04X\n", opcode);
+        return false;
+    }
 }
 
 
@@ -121,24 +132,35 @@ void dispatch_opcode(Chip8 *chip8, uint16_t opcode) {
  */
 static void op_0xxx(Chip8 *chip8, uint16_t opcode) {
     OpcodeHandler handler = table_0[opcode & 0x00FF];
-    if (handler) handler(chip8, opcode);
-    else /* SYS nnn - ignored */ ;
+    if (handler)
+        handler(chip8, opcode);
+    else // 0x0nnn ignored, SYS
+        fprintf(stderr, "Unknown sub-opcode in 0x0 group: 0x%04X\n", opcode);
 }
 
 // === 8xxx Group (bitwise, arithmetic, etc.) ===
 static void op_8xxx(Chip8 *chip8, uint16_t opcode) {
     OpcodeHandler handler = table_8[opcode & 0x000F];
-    if (handler) handler(chip8, opcode);
+    if (handler)
+        handler(chip8, opcode);
+    else
+        fprintf(stderr, "Unknown sub-opcode in 0x8 group: 0x%04X\n", opcode);
 }
 
 // === Exxx: Keypad skip instructions ===
 static void op_Exxx(Chip8 *chip8, uint16_t opcode) {
     OpcodeHandler handler = table_E[opcode & 0x00FF];
-    if (handler) handler(chip8, opcode);
+    if (handler)
+        handler(chip8, opcode);
+    else
+        fprintf(stderr, "Unknown sub-opcode in 0xE group: 0x%04X\n", opcode);
 }
 
 // === Fxxx: Timer, memory, input instructions ===
 static void op_Fxxx(Chip8 *chip8, uint16_t opcode) {
     OpcodeHandler handler = table_F[opcode & 0x00FF];
-    if (handler) handler(chip8, opcode);
+    if (handler)
+        handler(chip8, opcode);
+    else
+        fprintf(stderr, "Unknown sub-opcode in 0xF group: 0x%04X\n", opcode);
 }

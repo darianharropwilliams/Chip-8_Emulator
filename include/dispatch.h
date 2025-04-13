@@ -10,7 +10,7 @@ typedef void (*OpcodeHandler)(Chip8 *chip8, uint16_t opcode);
 void opcode_dispatch_init(void);
 
 // Given an opcode, decode and execute it using dispatch tables
-void dispatch_opcode(Chip8 *chip8, uint16_t opcode);
+bool dispatch_opcode(Chip8 *chip8, uint16_t opcode);
 
 
 void op_0xxx(Chip8 *chip8, uint16_t opcode); // Requires subdispatching
