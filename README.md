@@ -1,160 +1,197 @@
-# CHIP-8 Emulator
+# CHIP-8 Emulator — Modular, Testable, Web-Ready
 
-This project is a **modular, extensible CHIP-8 emulator written in C**, built with clarity, testability, and eventual web deployment in mind. It features:
+This project is a **feature-complete CHIP-8 emulator** written in **pure C** with **zero external dependencies except SDL2**, designed with **testability**, **modular dispatching**, and **browser deployment** in mind.
 
-- A dynamic, table-driven opcode dispatch system
-- Isolated subsystems for display, input, timers, and utility logic
-- A clean VM core that orchestrates fetch-decode-execute cycles
-- Readability and maintainability as core design principles
+It goes beyond basic emulation to offer:
+
+- A **clean VM core** with full `fetch-decode-execute` cycle management  
+- A **multi-level opcode dispatch system** for readable instruction handling  
+- **SDL2-based graphics/input** abstractions for native execution  
+- **Test mode** with memory dumps, instruction tracing, and fixture support  
+- Future-ready architecture for **WebAssembly (WASM)** deployment  
 
 ---
 
-## Project Structure
+## Project Layout
 
 ```
-├── include/
-│   ├── chip8.h         # Core emulator state and control
-│   ├── dispatch.h      # Opcode dispatch mechanism (main + subtables)
-│   ├── opcodes.h       # Opcode handler declarations
-│   ├── display.h       # SDL2-based 64x32 monochrome graphics
-│   ├── input.h         # Keypad mapping (16-key hex)
-│   ├── timer.h         # Delay and sound timer interface
-│   └── utils.h         # ROM loading, memory utils, debug helpers
-│
-├── src/
-│   ├── chip8.c         # Core VM: init, ROM load, emulation cycle
-│   ├── dispatch.c      # Opcode decoding + dispatch table wiring
-│   ├── opcodes.c       # Full implementation of 35+ CHIP-8 opcodes
-│   ├── display.c       # SDL2 display with XOR sprite rendering
-│   ├── input.c         # SDL2 key scanning and key state mapping
-│   ├── timer.c         # 60Hz decrement logic for delay/sound
-│   ├── utils.c         # ROM file I/O, memory copy, debugging
-│   └── main.c          # CLI entry point, emulation loop, timing
+CHIP-8/
+├── include/        # Modular subsystem headers
+├── src/            # Core emulator logic
+├── disasm/         # ROM disassembly reference
+├── fixtures/       # Sample ROMs for correctness testing
+├── tests/          # C + Python testing suite (test ROMs, dumps, assertions)
+├── build/          # Object files from build process
+├── .vscode/        # Dev tooling config (tasks, intellisense)
+├── SDL2.dll        # SDL runtime (Windows)
+├── chip8.exe       # Compiled emulator binary
+├── Makefile        # One-line build setup
+└── README.md       # You're reading it!
 ```
 
 ---
 
-## Architecture Overview
+## Architecture Deep Dive
 
-### `Chip8` VM Core
-Defined in `chip8.h`, the VM struct contains:
-- **Memory** (4K bytes)
-- **Registers**: `V0`–`VF`, index register `I`, and program counter `PC`
-- **Stack**: 16-level call stack + stack pointer
-- **Timers**: 8-bit `delay_timer`, `sound_timer` (decrement at 60Hz)
-- **Display**: Monochrome 64×32 screen (`display[]`)
-- **Keypad**: 16-key input state
-- **Flags**: `draw_flag` signals when screen needs redrawing
+### VM Core (`chip8.h/.c`)
 
-### Emulation Cycle (`chip8_cycle`)
-Called every frame; performs:
-1. Fetch 16-bit opcode from memory
-2. Advance `PC` by 2
-3. Decode and dispatch instruction
-4. Update timers
-5. Scan keypad state
-6. Redraw display (if `draw_flag` is set)
+Encapsulates the full emulator state:
+- 4KB memory, 16 8-bit registers (`V0`–`VF`)
+- 16-level call stack and pointer
+- 2 timers (`delay_timer`, `sound_timer`) ticking at 60Hz
+- Monochrome 64×32 display buffer
+- 16-key keypad
+- Flags for redraw and test mode
+- ROM path used for memory dumps in test mode
+
+### Instruction Cycle
+
+Every `chip8_cycle()` call performs:
+
+1. **Fetch**: Read 2-byte opcode from `memory[pc]`  
+2. **Decode**: Route opcode using multi-level dispatch tables  
+3. **Execute**: Run associated handler (e.g., `op_7xkk`)  
+4. **Timers**: Decrement delay/sound timers if > 0  
+5. **Input**: Scan keyboard and update key states  
+6. **Render**: Refresh display if `draw_flag` is set  
 
 ---
 
 ## Opcode Dispatch System
 
-### `dispatch.c` + `opcodes.c`
-A hierarchical dispatch system routes instructions efficiently:
+Implemented in `dispatch.c`, using **hierarchical function pointer tables** for readable, efficient decoding.
 
-- **`main_table[16]`**: Dispatch by high nibble (`0xXNNN`)
-- **Subtables**:
-  - `table_0[256]`: `0x00E0`, `0x00EE`
-  - `table_8[16]`: `8xy0`–`8xyE` (bitwise, arithmetic)
-  - `table_E[256]`: Key skips `Ex9E`, `ExA1`
-  - `table_F[256]`: Timers, input, memory (`Fx07`–`Fx65`)
+### Lookup Tables
+- `main_table[0x10]`: High nibble (`0xXNNN`)
+- `table_0[0x100]`: Special opcodes (`0x00E0`, `0x00EE`)
+- `table_8[0x10]`: Bitwise/arithmetic (`8xy0`–`8xyE`)
+- `table_E[0x100]`: Key skips (`Ex9E`, `ExA1`)
+- `table_F[0x100]`: Timer, memory, input ops (`Fx07`–`Fx65`)
 
-Subgroups like `op_8xxx()` and `op_Fxxx()` perform nested decoding for maximum clarity and modularity.
+Each table routes to clearly named functions like `op_8xy4()` or `op_Fx1E()` for maintainability.
 
----
-
-## Display Module
-
-- Renders 64×32 display buffer to an SDL2 window
-- Each pixel scaled (10x default)
-- XOR-based sprite drawing
-- Collision detection sets `VF` register
-- Supports display clear and wraparound rendering
+**All 35+ CHIP-8 opcodes** are implemented and tested.
 
 ---
 
-## Input Module
+## Display Module (`display.c`)
 
-- Polls host keyboard using SDL
-- Maps host keys to CHIP-8 16-key layout
-- Supports polling or manual state mapping
-- `is_key_pressed()` used by opcodes for conditionals
-
----
-
-##  Timer Module
-
-- `delay_timer` and `sound_timer` initialized to 0
-- Decremented at 60Hz each cycle
-- Functions to get/set both timers
-- Future hook for integrating audio output when `sound_timer > 0`
+- Uses **SDL2** to render the 64×32 framebuffer
+- Each pixel scaled (default: `10x`) for modern screens
+- Sprites drawn using XOR logic (with VF collision detection)
+- Wraps around screen edges when sprites overflow
+- Functions:
+  - `draw_sprite()` — Core draw logic with collision return
+  - `update_display()` — Pushes current buffer to screen
+  - `clear_display()` — Resets the screen
 
 ---
 
-## Utility Module
+## Input Module (`input.c`)
 
-- `load_rom()`: Reads ROM from file into memory at `0x200`
-- `memory_copy()`: Wraps `memcpy()` for VM-internal transfers
-- `swap_bytes()`: Byte mirror helper for potential sprite features
-- `print_registers()`: Debugging tool for CPU state
+- Maps SDL scancodes to 16-key CHIP-8 keypad
+- Polls keys via `SDL_GetKeyboardState()`
+- Supports:
+  - `keypad_scan()` — Update key states every frame
+  - `keypad_map()` — Manually map keys (future WASM hook)
+  - `is_key_pressed()` — For conditionals and `Fx0A` opcode
 
----
-
-## Current Status: Core Emulation Complete
-
-### Implemented:
-- All **35 documented CHIP-8 instructions** with overflow, bounds, and stack error checks
-- Hierarchical **opcode dispatch** via lookup tables
-- Display and input logic (via SDL2)
-- 60Hz **timer decrement logic**
-- ROM loading and cycle management
-
-### In Progress / Upcoming:
-- **Fragment `opcodes.c`** into multiple files (e.g., `opcodes_0x.c`, `opcodes_8x.c`, etc.)
-- **Implement `memory_check()`** for centralized bounds checking
-- Replace debug `fprintf()` with `assert()` and testable flags
-- Add **unit tests** for instruction correctness
-- Optional: track opcode usage for profiling/debug
+Layout:
+```
+1 2 3 C      →    1 2 3 4
+4 5 6 D      →    Q W E R
+7 8 9 E      →    A S D F
+A 0 B F      →    Z X C V
+```
 
 ---
 
-## Future Plans: WebAssembly Support
+## Timer Module (`timer.c`)
 
-The project is being written with eventual browser deployment in mind.
-
-### Key Considerations:
-- SDL2 will be replaced or abstracted (e.g., into `platform_sdl.c` vs `platform_wasm.c`)
-- `fprintf(stderr, ...)` will be routed through `log_error()` for WebAssembly-safe output
-- Fontset and ROM memory regions may be **marked as readonly** in strict/debug modes
-- The core VM (`chip8.c`) will remain unchanged between platforms
-
-### WASM Targets:
-- Run the emulator in-browser via Emscripten
-- Expose `chip8_cycle()` and `chip8_load_rom()` to JS bindings
-- Embed on personal site for public demos
+- Two 8-bit timers (`delay_timer`, `sound_timer`)
+- Updated at **60Hz**
+- SDL sound output hook is stubbed (easily extensible)
+- Exposed functions for `Fx07`, `Fx15`, `Fx18`, etc.
 
 ---
 
-## Testing Plans
+## Utility Module (`utils.c`)
 
-- Instruction-by-instruction test cases (e.g., test `op_7xkk` with known registers)
-- VM snapshot validation (memory, display, registers after cycle)
-- Debug toggle to log execution trace
+- `load_rom()` — Loads ROM to `memory + 0x200`
+- `memory_copy()` — Internal memcpy wrapper
+- `swap_bytes()` — Bitwise mirror utility (for sprite mods)
+- `print_registers()` — Debug CPU state
+- `test_halt()` — Debug HALT triggered on RET in test mode
+- `dump_memory()` — Dumps memory snapshot for ROM to `tests/python/dumps/*.bin`
+
+---
+
+## Testing & Debugging
+
+**Test mode** (`--test`) runs the emulator deterministically:
+
+- Executes a fixed number of frames at locked timing
+- Dumps internal state and memory snapshot on exit
+- Compatible with `tests/python/` harness:
+  - `generate_test_roms.py` — Generates test ROMs
+  - `test_chip8.py` — Loads dumps and asserts correctness
+  - `fixtures/` — ROMs + disassemblies for visual inspection
+
+> This enables true **ROM-level regression testing**, a rare feature in most CHIP-8 emulators.
+
+---
+
+## Engineering Highlights
+
+Here’s why this emulator stands out from the crowd:
+
+| Feature | Description |
+|--------|-------------|
+| **Modular Opcode Dispatch** | Multi-table architecture promotes clarity and scalability |
+| **Test Harness Integration** | Python + C testing pipeline with fixture dumps |
+| **Debug Infrastructure** | `DEBUG_PRINT()` macros gated by `test_mode` |
+| **Separation of Concerns** | Each subsystem — input, display, timing, memory — is isolated |
+| **Cycle-accurate Emulation** | Full support for instruction set and timer resolution |
+| **WASM-Ready** | Platform-agnostic VM core, with plans for `platform_wasm.c` |
+| **Memory Safety Aware** | Bounds checks on stack, memory, and I register usage |
+| **Real-time Feedback** | Sprite collisions, timer warnings, and overflow logs built-in |
+
+---
+
+## Future Roadmap
+
+### In Progress
+- Fragment `opcodes.c` into `opcodes_0x.c`, `opcodes_8x.c`, etc.
+- `memory_check()` centralized bounds enforcement
+- Swap `fprintf()` with `assert()` where appropriate
+- Add comprehensive instruction unit tests
+
+### Planned
+- WASM version for browser embedding
+- Instruction coverage profiler
+- Opcode trace visualizer
+- Basic audio beep support when `sound_timer > 0`
+
+---
+
+## WASM Deployment Plans
+
+This emulator is being built with **web deployment in mind**.
+
+### Changes planned:
+- Replace SDL with `platform_*.c` abstraction layer
+- Use `log_error()` to replace `fprintf()` in browser builds
+- Expose `chip8_cycle()`, `chip8_load_rom()` via JS
+- Embed live emulator into personal portfolio site
 
 ---
 
 ## License
 
-This project is currently unlicensed. Please feel free to adapt or use the structure and architecture for your own learning, emulator projects, or educational purposes.
+This project is currently unlicensed. Use the structure, code, or test infrastructure freely for **learning, hacking, or building your own emulators**.
 
 ---
+
+## Author Notes
+
+This project was built as a **systems-level showcase** — combining low-level memory manipulation, graphics handling, input polling, and CPU emulation — all while remaining modular, portable, and *fun*.
