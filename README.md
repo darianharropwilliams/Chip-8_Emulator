@@ -16,17 +16,13 @@ It goes beyond basic emulation to offer:
 
 ```
 CHIP-8/
-├── include/        # Modular subsystem headers
-├── src/            # Core emulator logic
 ├── disasm/         # ROM disassembly reference
 ├── fixtures/       # Sample ROMs for correctness testing
+├── include/        # Modular subsystem headers
+├── roms/           # Full game ROMS for real-world testing
+├── src/            # Core emulator logic
 ├── tests/          # C + Python testing suite (test ROMs, dumps, assertions)
-├── build/          # Object files from build process
-├── .vscode/        # Dev tooling config (tasks, intellisense)
-├── SDL2.dll        # SDL runtime (Windows)
-├── chip8.exe       # Compiled emulator binary
-├── Makefile        # One-line build setup
-└── README.md       # You're reading it!
+└── Makefile        # One-line build setup
 ```
 
 ---
