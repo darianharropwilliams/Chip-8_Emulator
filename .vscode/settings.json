@@ -4,5 +4,6 @@
         "chip8.h": "c",
         "compare": "c",
         "string.h": "c"
-    }
+    },
+    "makefile.configureOnOpen": false
 }

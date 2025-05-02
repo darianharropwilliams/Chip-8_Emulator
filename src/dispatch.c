@@ -1,5 +1,6 @@
 #include "chip8.h"
 #include <stdio.h>
+#include <string.h>
 #include "dispatch.h"
 #include "opcodes.h"
 
@@ -130,7 +131,7 @@ bool dispatch_opcode(Chip8 *chip8, uint16_t opcode) {
  * This instruction is only used on the old computers on which Chip-8 was
  * originally implemented. It is ignored by modern interpreters.
  */
-static void op_0xxx(Chip8 *chip8, uint16_t opcode) {
+void op_0xxx(Chip8 *chip8, uint16_t opcode) {
     OpcodeHandler handler = table_0[opcode & 0x00FF];
     if (handler)
         handler(chip8, opcode);
@@ -139,7 +140,7 @@ static void op_0xxx(Chip8 *chip8, uint16_t opcode) {
 }
 
 // === 8xxx Group (bitwise, arithmetic, etc.) ===
-static void op_8xxx(Chip8 *chip8, uint16_t opcode) {
+void op_8xxx(Chip8 *chip8, uint16_t opcode) {
     OpcodeHandler handler = table_8[opcode & 0x000F];
     if (handler)
         handler(chip8, opcode);
@@ -148,7 +149,7 @@ static void op_8xxx(Chip8 *chip8, uint16_t opcode) {
 }
 
 // === Exxx: Keypad skip instructions ===
-static void op_Exxx(Chip8 *chip8, uint16_t opcode) {
+void op_Exxx(Chip8 *chip8, uint16_t opcode) {
     OpcodeHandler handler = table_E[opcode & 0x00FF];
     if (handler)
         handler(chip8, opcode);
@@ -157,7 +158,7 @@ static void op_Exxx(Chip8 *chip8, uint16_t opcode) {
 }
 
 // === Fxxx: Timer, memory, input instructions ===
-static void op_Fxxx(Chip8 *chip8, uint16_t opcode) {
+void op_Fxxx(Chip8 *chip8, uint16_t opcode) {
     OpcodeHandler handler = table_F[opcode & 0x00FF];
     if (handler)
         handler(chip8, opcode);

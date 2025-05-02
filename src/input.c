@@ -1,6 +1,7 @@
 #include "input.h"
+#include "utils.h"
 #include <string.h>  // for memset
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include <stdio.h>
 
 
@@ -27,7 +28,7 @@ static const SDL_Scancode keymap[KEYPAD_SIZE] = {
 // Initialize the keypad (set all keys to unpressed)
 void keypad_init(Chip8 *chip8) {
     if (!chip8) {
-        fprintf(stderr, "keypad_init called on null Chip8 pointer\n");
+        DEBUG_PRINT(chip8, "keypad_init called on null Chip8 pointer\n");
         return;
     }
     
@@ -37,7 +38,7 @@ void keypad_init(Chip8 *chip8) {
 // Poll the physical keyboard and update chip8->keypad[]
 void keypad_scan(Chip8 *chip8) {
     if (!chip8) {
-        fprintf(stderr, "keypad_scan: chip8 pointer is null\n");
+        DEBUG_PRINT(chip8, "keypad_scan: chip8 pointer is null\n");
         return;
     }
 
@@ -45,7 +46,7 @@ void keypad_scan(Chip8 *chip8) {
 
     const Uint8 *keystate = SDL_GetKeyboardState(NULL);
     if (!keystate) {
-        fprintf(stderr, "keypad_scan: SDL_GetKeyboardState returned NULL\n");
+        DEBUG_PRINT(chip8, "keypad_scan: SDL_GetKeyboardState returned NULL\n");
         return;
     }
 
@@ -58,12 +59,12 @@ void keypad_scan(Chip8 *chip8) {
 // Set a key state manually (used by SDL event loop)
 void keypad_map(Chip8 *chip8, uint8_t key, bool state) {
     if (!chip8) {
-        fprintf(stderr, "keypad_map called on null Chip8 pointer\n");
+        DEBUG_PRINT(chip8, "keypad_map called on null Chip8 pointer\n");
         return;
     }    
 
     if (key >= KEYPAD_SIZE) {
-        fprintf(stderr, "Invalid key index: %d\n", key);
+        DEBUG_PRINT(chip8, "Invalid key index: %d\n", key);
         return;
     }
     chip8->keypad[key] = state;
@@ -72,13 +73,13 @@ void keypad_map(Chip8 *chip8, uint8_t key, bool state) {
 // Return whether a key is currently pressed
 bool is_key_pressed(Chip8 *chip8, uint8_t key) {
     if (!chip8) {
-        fprintf(stderr, "is_key_pressed called on null Chip8 pointer\n");
+        DEBUG_PRINT(chip8, "is_key_pressed called on null Chip8 pointer\n");
         return false;
     }    
 
     if (key < KEYPAD_SIZE) {
         return chip8->keypad[key];
     }
-    fprintf(stderr, "Invalid key index: %d\n", key);
+    DEBUG_PRINT(chip8, "Invalid key index: %d\n", key);
     return false;
 }

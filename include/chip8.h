@@ -28,6 +28,9 @@ typedef struct {
     uint8_t keypad[KEYPAD_SIZE];   // Key states
 
     bool draw_flag;                // Set when the screen needs to be redrawn
+
+    bool test_mode;
+    char rom_path[128];  // For test dump tracing
 } Chip8;
 
 // Core functions

@@ -1,46 +1,33 @@
-# Compiler and Flags
+# Compiler and flags
 CC = gcc
-CFLAGS = -Wall -g -std=c99 -I./include
-LDFLAGS =
+CFLAGS = -Wall -g -std=c99 -DDEBUG \
+         -I./include \
+         -I"C:/Program Files/SDL2-2.32.4/x86_64-w64-mingw32/include/SDL2"
 
-# Directories
-SRCDIR = src
-INCDIR = include
-BINDIR = build/bin
-OBJDIR = build/obj
+LDFLAGS = -L"C:/Program Files/SDL2-2.32.4/x86_64-w64-mingw32/lib" \
+          -lmingw32 -lSDL2main -lSDL2
 
-# Files
-SOURCES = $(wildcard $(SRCDIR)/*.c)
-OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
-EXEC = $(BINDIR)/chip8
+# Source and object layout
+SRC_DIR = src
+OBJ_DIR = build/obj
+OUT = chip8
 
-# Default target
-all: $(EXEC)
+# List of source files
+SRC = $(wildcard $(SRC_DIR)/*.c)
+OBJ = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC))
 
-# Linking the final executable
-$(EXEC): $(OBJECTS)
-	@mkdir -p $(BINDIR)
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $(EXEC)
+# Build output
+$(OUT): $(OBJ)
+	$(CC) $(OBJ) -o $@ $(LDFLAGS)
 
-# Compiling each .c file to .o
-$(OBJDIR)/%.o: $(SRCDIR)/%.c
-	@mkdir -p $(OBJDIR)
+# Compile each .c file to a .o in build/
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Clean up the build artifacts
+# Create build/ dir if not exists
+$(OBJ_DIR):
+	mkdir -p $(OBJ_DIR)
+
+# Clean build artifacts
 clean:
-	rm -rf $(OBJDIR) $(BINDIR)
-
-# Rebuild everything
-rebuild: clean all
-
-# Run the emulator
-run: $(EXEC)
-	./$(EXEC)
-
-# Test the Makefile with a dummy target
-.PHONY: all clean rebuild run
-
-all: $(EXEC)
-	# Copy SDL2.dll to output directory
-	cp ./lib/SDL2-2.28.5/x86_64-w64-mingw32/bin/SDL2.dll $(BINDIR)/
+	rm -f $(OBJ_DIR)/*.o $(OUT)

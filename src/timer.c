@@ -1,5 +1,6 @@
 // timer.c
 #include "timer.h"
+#include "utils.h"
 #include <stdint.h>
 #include <stdio.h>
 
@@ -9,7 +10,7 @@
 void timer_init(Chip8 *chip8) {
 
     if (!chip8) {
-        fprintf(stderr, "timer_init called with null pointer\n");
+        DEBUG_PRINT(chip8, "timer_init called with null pointer\n");
         return;
     }
     
@@ -23,7 +24,7 @@ void timer_init(Chip8 *chip8) {
 // ----------------------------------------------------------
 void timer_update(Chip8 *chip8) {
     if (!chip8) {
-        fprintf(stderr, "timer_update called with null pointer\n");
+        DEBUG_PRINT(chip8, "timer_update called with null pointer\n");
         return;
     }
     
@@ -44,7 +45,7 @@ void timer_update(Chip8 *chip8) {
 // ----------------------------------------------------------
 uint8_t get_delay_timer(Chip8 *chip8) {
     if (!chip8) {
-        fprintf(stderr, "get_delay_timer called with null pointer\n");
+        DEBUG_PRINT(chip8, "get_delay_timer called with null pointer\n");
         return 0;
     }
     
@@ -57,7 +58,7 @@ uint8_t get_delay_timer(Chip8 *chip8) {
 // ----------------------------------------------------------
 uint8_t get_sound_timer(Chip8 *chip8) {
     if (!chip8) {
-        fprintf(stderr, "get_sound_timer called with null pointer\n");
+        DEBUG_PRINT(chip8, "get_sound_timer called with null pointer\n");
         return 0;
     }
     
@@ -69,7 +70,7 @@ uint8_t get_sound_timer(Chip8 *chip8) {
 // ----------------------------------------------------------
 void set_delay_timer(Chip8 *chip8, uint8_t value) {
     if (!chip8) {
-        fprintf(stderr, "set_delay_timer called with null pointer\n");
+        DEBUG_PRINT(chip8, "set_delay_timer called with null pointer\n");
         return;
     }
     
@@ -81,7 +82,7 @@ void set_delay_timer(Chip8 *chip8, uint8_t value) {
 // ----------------------------------------------------------
 void set_sound_timer(Chip8 *chip8, uint8_t value) {
     if (!chip8) {
-        fprintf(stderr, "set_sound called with null pointer\n");
+        DEBUG_PRINT(chip8, "set_sound called with null pointer\n");
         return;
     }
     

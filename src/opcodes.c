@@ -5,6 +5,7 @@
 #include "utils.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #define OPCODE_NNN(op) ((op) & 0x0FFF)
 #define OPCODE_X(op) (((op) >> 8) & 0x0F)
@@ -24,23 +25,21 @@ void op_00E0(Chip8 *chip8, uint16_t opcode) {
     chip8->draw_flag = true;
 }
 
-/**
- * 00EE - RET
- * Return from a subroutine.
- * 
- * The interpreter sets the program counter to the address at the top of
- * the stack, then subtracts 1 from the stack pointer.
- */
-void op_00EE(Chip8 *chip8, uint16_t opcode) {
+#include "utils.h"  // Ensure this includes the test_halt() prototype
 
+void op_00EE(Chip8 *chip8, uint16_t opcode) {
     if (chip8->sp == 0) {
-        fprintf(stderr, "Stack underflow on RET\n");
+        if (chip8->test_mode) {
+            test_halt(chip8, chip8->rom_path);
+        }
+        DEBUG_PRINT(chip8, "Stack underflow on RET\n");
         return;
     }
 
+    DEBUG_PRINT(chip8, "[DEBUG] RET with SP=%u, target=0x%04X\n", chip8->sp, chip8->stack[chip8->sp - 1]);
     chip8->sp--;
     chip8->pc = chip8->stack[chip8->sp];
-
+    DEBUG_PRINT(chip8, "[DEBUG] RET to 0x%04X (SP=%u)\n", chip8->pc, chip8->sp);
 }
 
 /**
@@ -67,9 +66,12 @@ void op_2nnn(Chip8 *chip8, uint16_t opcode) {
     
     uint16_t address = OPCODE_NNN(opcode);
     if (chip8->sp >= STACK_SIZE) {
-        fprintf(stderr, "Stack overflow on CALL\n");
+        DEBUG_PRINT(chip8, "Stack overflow on CALL\n");
         return;
     }    
+
+    DEBUG_PRINT(chip8, "[DEBUG] CALL 0x%03X from 0x%04X (SP=%u)\n", address, chip8->pc, chip8->sp);
+
     chip8->stack[chip8->sp] = chip8->pc;
     chip8->sp++;
     chip8->pc = address;
@@ -136,6 +138,8 @@ void op_6xkk(Chip8 *chip8, uint16_t opcode) {
     uint8_t byte = OPCODE_KK(opcode);
 
     chip8->V[Vx] = byte;
+
+    DEBUG_PRINT(chip8, "[DEBUG] LD V%X, 0x%02X\n", Vx, byte);
 }
 
 /**
@@ -153,10 +157,11 @@ void op_7xkk(Chip8 *chip8, uint16_t opcode) {
 
     // Check for overflow (for debug/logging purposes)
     if (result < chip8->V[Vx]) {
-        fprintf(stderr, "Warning: ADD Vx, byte overflowed at V[%X]: %02X + %02X = %02X\n", Vx, chip8->V[Vx], byte, result);
+        DEBUG_PRINT(chip8, "Warning: ADD Vx, byte overflowed at V[%X]: %02X + %02X = %02X\n", Vx, chip8->V[Vx], byte, result);
     }
 
     chip8->V[Vx] = result;
+    DEBUG_PRINT(chip8, "[DEBUG] ADD V%X += 0x%02X → 0x%02X\n", Vx, byte, chip8->V[Vx]);
 
 }
 
@@ -341,8 +346,15 @@ void op_9xy0(Chip8 *chip8, uint16_t opcode) {
 void op_Annn(Chip8 *chip8, uint16_t opcode) {
 
     uint16_t address = OPCODE_NNN(opcode);
-
+    if (address >= MEMORY_SIZE) {
+        DEBUG_PRINT(chip8, "Jump address out of bounds: 0x%03X\n", address);
+        return;
+    }
+    uint16_t old_I = chip8->I;
     chip8->I = address;
+
+    DEBUG_PRINT(chip8, "[DEBUG] Set I = 0x%03X (was 0x%03X)\n", chip8->I, old_I);
+
 }
 
 /**
@@ -354,6 +366,11 @@ void op_Annn(Chip8 *chip8, uint16_t opcode) {
 void op_Bnnn(Chip8 *chip8, uint16_t opcode) {
 
     uint16_t address = OPCODE_NNN(opcode);
+    if (address >= MEMORY_SIZE) {
+        DEBUG_PRINT(chip8, "Jump address out of bounds: 0x%03X\n", address);
+        return;
+    }
+    
     chip8->pc = address + chip8->V[0x0];
 }
 
@@ -449,6 +466,8 @@ void op_Fx07(Chip8 *chip8, uint16_t opcode) {
     uint8_t Vx = OPCODE_X(opcode);
 
     chip8->V[Vx] = chip8->delay_timer;
+
+    DEBUG_PRINT(chip8, "[DEBUG] LD V%X = DT (%u)\n", Vx, chip8->V[Vx]);
 }
 
 /**
@@ -463,7 +482,7 @@ void op_Fx0A(Chip8 *chip8, uint16_t opcode) {
     for (uint8_t key = 0; key < KEYPAD_SIZE; ++key) {
         if (chip8->keypad[key]) {
             if (key >= KEYPAD_SIZE) {
-                fprintf(stderr, "Fx0A: Key index out of range: %u\n", key);
+                DEBUG_PRINT(chip8, "Fx0A: Key index out of range: %u\n", key);
                 return;
             }
 
@@ -472,7 +491,8 @@ void op_Fx0A(Chip8 *chip8, uint16_t opcode) {
         }
     }
 
-    // No key pressed: repeat this instruction by not advancing pc
+    // No key was pressed — halt execution by repeating the instruction
+    DEBUG_PRINT(chip8, "[DEBUG] Fx0A waiting for key press: no key currently down\n");
     chip8->pc -= 2;
 }
 
@@ -488,6 +508,8 @@ void op_Fx15(Chip8 *chip8, uint16_t opcode) {
     uint8_t Vx = OPCODE_X(opcode);
 
     chip8->delay_timer = chip8->V[Vx];
+
+    DEBUG_PRINT(chip8, "[DEBUG] LD DT = V%X (%u)\n", Vx, chip8->V[Vx]);
 }
 
 
@@ -502,6 +524,8 @@ void op_Fx18(Chip8 *chip8, uint16_t opcode) {
     uint8_t Vx = OPCODE_X(opcode);
 
     chip8->sound_timer = chip8->V[Vx];
+
+    DEBUG_PRINT(chip8, "[DEBUG] LD ST = V%X (%u)\n", Vx, chip8->V[Vx]);
 }
 /**
  * Fx1E - ADD I, Vx
@@ -511,8 +535,10 @@ void op_Fx18(Chip8 *chip8, uint16_t opcode) {
  */
 void op_Fx1E(Chip8 *chip8, uint16_t opcode) {
     uint8_t Vx = OPCODE_X(opcode);
-
+    uint16_t old_I = chip8->I;
     chip8->I = (chip8->I + chip8->V[Vx]) & 0xFFFF; // though I is 16-bit anyway
+    DEBUG_PRINT(chip8, "[DEBUG] Set I = 0x%03X (was 0x%03X)\n", chip8->I, old_I);
+
 
 }
 
@@ -530,7 +556,7 @@ void op_Fx29(Chip8 *chip8, uint16_t opcode) {
     uint8_t digit = chip8->V[Vx];
 
     if (digit > 0xF) {
-        fprintf(stderr, "Invalid font digit in Fx29: Vx=0x%X, value=0x%X\n", Vx, digit);
+        DEBUG_PRINT(chip8, "Invalid font digit in Fx29: Vx=0x%X, value=0x%X\n", Vx, digit);
         return;
     }    
 
@@ -552,7 +578,7 @@ void op_Fx33(Chip8 *chip8, uint16_t opcode) {
     uint8_t value = chip8->V[Vx];
 
     if (chip8->I + 2 >= MEMORY_SIZE) {
-        fprintf(stderr, "Memory overflow: I=0x%03X, Vx=0x%X (opcode: 0x%04X)\n", chip8->I, Vx, opcode);
+        DEBUG_PRINT(chip8, "Memory overflow: I=0x%03X, Vx=0x%X (opcode: 0x%04X)\n", chip8->I, Vx, opcode);
         return;
     }
     
@@ -560,6 +586,13 @@ void op_Fx33(Chip8 *chip8, uint16_t opcode) {
     chip8->memory[chip8->I] = value / 100;
     chip8->memory[chip8->I + 1] = (value / 10) % 10;
     chip8->memory[chip8->I + 2] = value % 10;
+
+    DEBUG_PRINT(chip8, "[DEBUG] BCD V%X (0x%02X) to I=0x%03X → [%u, %u, %u]\n",
+        Vx, value, chip8->I,
+        chip8->memory[chip8->I],
+        chip8->memory[chip8->I + 1],
+        chip8->memory[chip8->I + 2]);
+
 }
 
 /**
@@ -573,12 +606,14 @@ void op_Fx55(Chip8 *chip8, uint16_t opcode) {
     uint8_t Vx = OPCODE_X(opcode);
 
     if (chip8->I + Vx >= MEMORY_SIZE) {
-        fprintf(stderr, "Memory overflow: I=0x%03X, Vx=0x%X (opcode: 0x%04X)\n", chip8->I, Vx, opcode);
+        DEBUG_PRINT(chip8, "Memory overflow: I=0x%03X, Vx=0x%X (opcode: 0x%04X)\n", chip8->I, Vx, opcode);
         return;
     }
     
     for (int i = 0; i <= Vx; i++)
         chip8->memory[chip8->I + i] = chip8->V[i]; 
+
+    DEBUG_PRINT(chip8, "[DEBUG] LD [I], V0–V%X to 0x%03X\n", Vx, chip8->I);
 
 }
 
@@ -593,10 +628,13 @@ void op_Fx65(Chip8 *chip8, uint16_t opcode) {
     uint8_t Vx = OPCODE_X(opcode);
 
     if (chip8->I + Vx >= MEMORY_SIZE) {
-        fprintf(stderr, "Memory overflow: I=0x%03X, Vx=0x%X (opcode: 0x%04X)\n", chip8->I, Vx, opcode);
+        DEBUG_PRINT(chip8, "Memory overflow: I=0x%03X, Vx=0x%X (opcode: 0x%04X)\n", chip8->I, Vx, opcode);
         return;
     }    
 
     for (int i = 0; i <= Vx; i++)
         chip8->V[i] = chip8->memory[chip8->I + i];
+
+    DEBUG_PRINT(chip8, "[DEBUG] LD V0–V%X from [I] = 0x%03X\n", Vx, chip8->I);
+
 }

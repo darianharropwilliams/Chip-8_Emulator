@@ -1,6 +1,7 @@
 #include "display.h"
+#include "utils.h"
 #include <string.h>
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include <stdio.h>
 
 #define SCALE 10  // Each CHIP-8 pixel is scaled up to a 10x10 square
@@ -17,7 +18,7 @@ static SDL_Renderer* renderer = NULL;
 // ----------------------------------------------------------
 void display_init(Chip8 *chip8) {
     if (!chip8) {
-        fprintf(stderr, "display_init called on null Chip8 pointer\n");
+        DEBUG_PRINT(chip8, "display_init called on null Chip8 pointer\n");
         return;
     }
 
@@ -25,7 +26,7 @@ void display_init(Chip8 *chip8) {
     chip8->draw_flag = true;
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+        DEBUG_PRINT(chip8, "SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
         exit(1);
     }
 
@@ -37,13 +38,13 @@ void display_init(Chip8 *chip8) {
                               SDL_WINDOW_SHOWN);
 
     if (!window) {
-        fprintf(stderr, "Window could not be created! SDL_Error: %s\n", SDL_GetError());
+        DEBUG_PRINT(chip8, "Window could not be created! SDL_Error: %s\n", SDL_GetError());
         exit(1);
     }
 
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer) {
-        fprintf(stderr, "Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
+        DEBUG_PRINT(chip8, "Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
         exit(1);
     }
 }
@@ -53,7 +54,7 @@ void display_init(Chip8 *chip8) {
 // ----------------------------------------------------------
 void clear_display(Chip8 *chip8) {
     if (!chip8) {
-        fprintf(stderr, "clear_display called on null Chip8 pointer\n");
+        DEBUG_PRINT(chip8, "clear_display called on null Chip8 pointer\n");
         return;
     }
 
@@ -70,13 +71,13 @@ void clear_display(Chip8 *chip8) {
 // ----------------------------------------------------------
 int draw_sprite(Chip8 *chip8, uint8_t x, uint8_t y, uint8_t height, const uint8_t *sprite) {
     if (!chip8) {
-        fprintf(stderr, "draw_sprite called on null Chip8 pointer\n");
-        return;
+        DEBUG_PRINT(chip8, "draw_sprite called on null Chip8 pointer\n");
+        return 0;
     }
 
 
     if (chip8->I + height > MEMORY_SIZE) {
-        fprintf(stderr, "draw_sprite error: sprite read out of bounds (I=%04X, height=%d)\n", chip8->I, height);
+        DEBUG_PRINT(chip8, "draw_sprite error: sprite read out of bounds (I=%04X, height=%d)\n", chip8->I, height);
         return 0;
     }
 
@@ -108,12 +109,12 @@ int draw_sprite(Chip8 *chip8, uint8_t x, uint8_t y, uint8_t height, const uint8_
 // ----------------------------------------------------------
 void update_display(Chip8 *chip8) {
     if (!chip8) {
-        fprintf(stderr, "update_display called on null Chip8 pointer\n");
+        DEBUG_PRINT(chip8, "update_display called on null Chip8 pointer\n");
         return;
     }
 
     if (!renderer) {
-        fprintf(stderr, "update_display called before renderer was initialized\n");
+        DEBUG_PRINT(chip8, "update_display called before renderer was initialized\n");
         return;
     }
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Black background
