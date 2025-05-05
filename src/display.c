@@ -1,5 +1,6 @@
 #include "display.h"
 #include "utils.h"
+#include "timer.h"
 #include <string.h>
 #include <SDL.h>
 #include <stdio.h>
@@ -25,7 +26,7 @@ void display_init(Chip8 *chip8) {
     memset(chip8->display, 0, sizeof(chip8->display));
     chip8->draw_flag = true;
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
         DEBUG_PRINT(chip8, "SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
         exit(1);
     }
@@ -47,7 +48,10 @@ void display_init(Chip8 *chip8) {
         DEBUG_PRINT(chip8, "Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
         exit(1);
     }
+
+    audio_init();
 }
+
 
 // ----------------------------------------------------------
 // Clear the display buffer and set draw flag

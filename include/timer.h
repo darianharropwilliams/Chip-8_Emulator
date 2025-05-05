@@ -2,7 +2,7 @@
 #define TIMER_H
 
 #include "chip8.h"
-
+#include <SDL.h>
 // Initialize the timers (set both timers to 0)
 void timer_init(Chip8 *chip8);
 
@@ -20,5 +20,7 @@ void set_delay_timer(Chip8 *chip8, uint8_t value);
 
 // Set the sound timer value
 void set_sound_timer(Chip8 *chip8, uint8_t value);
-
+void audio_callback(void *userdata, Uint8 *stream, int len);
+void audio_init();
+void audio_quit();
 #endif

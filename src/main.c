@@ -8,6 +8,7 @@
 #include "chip8.h"
 #include "display.h"
 #include "utils.h"
+#include "timer.h"
 
 Chip8 chip8;
 
@@ -90,5 +91,6 @@ int SDL_main(int argc, char *argv[]) {
     }
 
     display_quit();
+    audio_quit();
     return EXIT_SUCCESS;
 }
