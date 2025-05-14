@@ -160,6 +160,12 @@ Here’s why this emulator stands out from the crowd:
 
 ---
 
+### ROM Attribution
+
+The ROMs used in this project are part of a well-known set of public domain CHIP-8 programs historically used for emulator development and testing. These files were originally sourced from a GitHub repository that I can no longer identify due to cleared browser data.
+
+If you recognize the original maintainer or repo, please reach out — I'd be happy to add proper credit and a link.
+
 ## Future Roadmap
 
 ### In Progress

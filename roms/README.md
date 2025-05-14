@@ -1,0 +1,1 @@
+These ROMs are widely distributed examples used in CHIP-8 emulator development. They were originally obtained from a public GitHub repository, but the source link has since been lost. If you recognize the original collection or author, please contact me so I can include proper attribution.
