@@ -19,10 +19,12 @@ CHIP-8/
 ├── disasm/         # ROM disassembly reference
 ├── fixtures/       # Sample ROMs for correctness testing
 ├── include/        # Modular subsystem headers
-├── roms/           # Full game ROMS for real-world testing
+├── platform/       # SDL2 and WASM platform backends for display, input, audio
+├── roms/           # Full game ROMs for real-world testing
 ├── src/            # Core emulator logic
 ├── tests/          # C + Python testing suite (test ROMs, dumps, assertions)
 └── Makefile        # One-line build setup
+
 ```
 ---
 
