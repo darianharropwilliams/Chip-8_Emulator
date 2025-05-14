@@ -1,21 +1,15 @@
 #include "display.h"
 #include "utils.h"
-#include "timer.h"
+#include "platform.h"
 #include <string.h>
-#include <SDL.h>
-#include <stdio.h>
 
-#define SCALE 10  // Each CHIP-8 pixel is scaled up to a 10x10 square
-
-// SDL window and renderer (static so only available within this file)
-static SDL_Window* window = NULL;
-static SDL_Renderer* renderer = NULL;
+#define SCALE 10  // Still used internally in some contexts (e.g. SDL)
 
 // ----------------------------------------------------------
-// Initialize the display:
-// - Clear the screen buffer
-// - Set the draw flag
-// - Initialize SDL, create window and renderer
+// Initializes the display system:
+// - Clears the framebuffer
+// - Sets draw_flag so the screen gets redrawn
+// - Initializes the underlying platform layer (SDL or WASM)
 // ----------------------------------------------------------
 void display_init(Chip8 *chip8) {
     if (!chip8) {
@@ -23,38 +17,15 @@ void display_init(Chip8 *chip8) {
         return;
     }
 
-    memset(chip8->display, 0, sizeof(chip8->display));
-    chip8->draw_flag = true;
+    memset(chip8->display, 0, sizeof(chip8->display));  // Clear framebuffer
+    chip8->draw_flag = true;                            // Mark screen for update
 
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
-        DEBUG_PRINT(chip8, "SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
-        exit(1);
-    }
-
-    window = SDL_CreateWindow("CHIP-8 Emulator",
-                              SDL_WINDOWPOS_CENTERED,
-                              SDL_WINDOWPOS_CENTERED,
-                              DISPLAY_WIDTH * SCALE,
-                              DISPLAY_HEIGHT * SCALE,
-                              SDL_WINDOW_SHOWN);
-
-    if (!window) {
-        DEBUG_PRINT(chip8, "Window could not be created! SDL_Error: %s\n", SDL_GetError());
-        exit(1);
-    }
-
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (!renderer) {
-        DEBUG_PRINT(chip8, "Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
-        exit(1);
-    }
-
-    audio_init();
+    platform_init();  // Initialize SDL or WASM display backend
 }
 
-
 // ----------------------------------------------------------
-// Clear the display buffer and set draw flag
+// Clears the CHIP-8 framebuffer and triggers a redraw.
+// This is typically used by the CLS (0x00E0) opcode.
 // ----------------------------------------------------------
 void clear_display(Chip8 *chip8) {
     if (!chip8) {
@@ -62,23 +33,24 @@ void clear_display(Chip8 *chip8) {
         return;
     }
 
-    memset(chip8->display, 0, sizeof(chip8->display));
-    chip8->draw_flag = true;
+    memset(chip8->display, 0, sizeof(chip8->display));  // Set all pixels to 0
+    chip8->draw_flag = true;                            // Request a redraw
 }
 
 // ----------------------------------------------------------
-// Draw a sprite on the display at (x, y).
-// - Each byte in `sprite` represents one row of 8 pixels.
-// - XORs each pixel onto display buffer.
-// - Wraps around screen edges.
-// - Returns 1 if any pixels were flipped from 1 to 0.
+// Draws a sprite at (x, y) with a height of N bytes.
+// Each sprite byte represents 8 horizontal pixels.
+// Pixels are XORed onto the screen, and if any pixels are
+// erased (from 1 to 0), the function returns 1 to indicate
+// a collision, as per CHIP-8 spec (VF gets set accordingly).
+//
+// Sprite wrapping is handled using modulo on coordinates.
 // ----------------------------------------------------------
 int draw_sprite(Chip8 *chip8, uint8_t x, uint8_t y, uint8_t height, const uint8_t *sprite) {
     if (!chip8) {
         DEBUG_PRINT(chip8, "draw_sprite called on null Chip8 pointer\n");
         return 0;
     }
-
 
     if (chip8->I + height > MEMORY_SIZE) {
         DEBUG_PRINT(chip8, "draw_sprite error: sprite read out of bounds (I=%04X, height=%d)\n", chip8->I, height);
@@ -90,17 +62,17 @@ int draw_sprite(Chip8 *chip8, uint8_t x, uint8_t y, uint8_t height, const uint8_
     for (uint8_t row = 0; row < height; ++row) {
         uint8_t sprite_byte = sprite[row];
 
-        // Wrapping behavior: sprites that overflow past screen edges will wrap around
         for (uint8_t col = 0; col < 8; ++col) {
+            // If bit is set, process the pixel
             if ((sprite_byte & (0x80 >> col)) != 0) {
                 uint8_t px = (x + col) % DISPLAY_WIDTH;
                 uint8_t py = (y + row) % DISPLAY_HEIGHT;
                 uint16_t index = py * DISPLAY_WIDTH + px;
 
                 if (chip8->display[index] == 1)
-                    collision = 1;
+                    collision = 1;  // Sprite pixel collided with existing pixel
 
-                chip8->display[index] ^= 1;
+                chip8->display[index] ^= 1;  // XOR toggle
             }
         }
     }
@@ -109,7 +81,8 @@ int draw_sprite(Chip8 *chip8, uint8_t x, uint8_t y, uint8_t height, const uint8_
 }
 
 // ----------------------------------------------------------
-// Render the CHIP-8 display buffer to the SDL window
+// Sends the current framebuffer to the screen using the platform layer.
+// This should be called when draw_flag is true.
 // ----------------------------------------------------------
 void update_display(Chip8 *chip8) {
     if (!chip8) {
@@ -117,37 +90,12 @@ void update_display(Chip8 *chip8) {
         return;
     }
 
-    if (!renderer) {
-        DEBUG_PRINT(chip8, "update_display called before renderer was initialized\n");
-        return;
-    }
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Black background
-    SDL_RenderClear(renderer);
-    
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255); // White pixels
-
-    for (int y = 0; y < DISPLAY_HEIGHT; y++) {
-        for (int x = 0; x < DISPLAY_WIDTH; x++) {
-            if (chip8->display[y * DISPLAY_WIDTH + x]) {
-                SDL_Rect pixel = {
-                    .x = x * SCALE,
-                    .y = y * SCALE,
-                    .w = SCALE,
-                    .h = SCALE
-                };
-                SDL_RenderFillRect(renderer, &pixel);
-            }
-        }
-    }
-
-    SDL_RenderPresent(renderer);
+    platform_update_display(chip8->display);  // Backend-specific draw call
 }
 
 // ----------------------------------------------------------
-// Clean up SDL resources (optional call at program end)
+// Shut down display resources (e.g. SDL window and renderer).
 // ----------------------------------------------------------
 void display_quit() {
-    if (renderer) SDL_DestroyRenderer(renderer);
-    if (window) SDL_DestroyWindow(window);
-    SDL_Quit();
+    platform_quit();  // Cleanup handled by SDL or WASM
 }

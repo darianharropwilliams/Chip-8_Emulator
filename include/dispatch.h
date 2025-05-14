@@ -3,21 +3,19 @@
 
 #include "chip8.h"
 
-// Type alias for an opcode handler function
+// Function pointer type for opcode handlers
 typedef void (*OpcodeHandler)(Chip8 *chip8, uint16_t opcode);
 
-// Initialize all dispatch tables (main and subtables)
+// Initialize main dispatch table and subdispatch tables
 void opcode_dispatch_init(void);
 
-// Given an opcode, decode and execute it using dispatch tables
+// Decode and dispatch an opcode to the appropriate handler
 bool dispatch_opcode(Chip8 *chip8, uint16_t opcode);
 
-
-void op_0xxx(Chip8 *chip8, uint16_t opcode); // Requires subdispatching
-void op_8xxx(Chip8 *chip8, uint16_t opcode); // Requires subdipatching
-void op_Exxx(Chip8 *chip8, uint16_t opcode); // Requires subdispatching
-void op_Fxxx(Chip8 *chip8, uint16_t opcode); // Requires subdispatching
-
-
+// Special-case dispatchers that need further decoding based on lower bits
+void op_0xxx(Chip8 *chip8, uint16_t opcode); // For opcodes starting with 0x0***
+void op_8xxx(Chip8 *chip8, uint16_t opcode); // For opcodes starting with 0x8***
+void op_Exxx(Chip8 *chip8, uint16_t opcode); // For opcodes starting with 0xE***
+void op_Fxxx(Chip8 *chip8, uint16_t opcode); // For opcodes starting with 0xF***
 
 #endif

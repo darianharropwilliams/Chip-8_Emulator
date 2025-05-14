@@ -7,27 +7,27 @@ CFLAGS = -Wall -g -std=c99 -DDEBUG \
 LDFLAGS = -L"C:/Program Files/SDL2-2.32.4/x86_64-w64-mingw32/lib" \
           -lmingw32 -lSDL2main -lSDL2
 
-# Source and object layout
+# Directories
 SRC_DIR = src
+PLATFORM_DIR = platform/sdl
 OBJ_DIR = build/obj
 OUT = chip8
 
-# List of source files
-SRC = $(wildcard $(SRC_DIR)/*.c)
-OBJ = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC))
+# Source files (full paths)
+SRC = $(wildcard $(SRC_DIR)/*.c) $(PLATFORM_DIR)/platform_sdl.c
 
-# Build output
+# Object files (preserving directory structure)
+OBJ = $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC))
+
+# Output binary
 $(OUT): $(OBJ)
 	$(CC) $(OBJ) -o $@ $(LDFLAGS)
 
-# Compile each .c file to a .o in build/
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
+# Rule to compile .c -> .o while preserving directory structure
+$(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Create build/ dir if not exists
-$(OBJ_DIR):
-	mkdir -p $(OBJ_DIR)
-
-# Clean build artifacts
+# Clean
 clean:
-	rm -f $(OBJ_DIR)/*.o $(OUT)
+	rm -rf $(OBJ_DIR) $(OUT)

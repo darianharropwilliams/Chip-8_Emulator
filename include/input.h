@@ -3,16 +3,16 @@
 
 #include "chip8.h"
 
-// Initialize the keypad (set all keys to unpressed state)
+// Set all keys to unpressed
 void keypad_init(Chip8 *chip8);
 
-// Scan the keypad and update key states (called each cycle)
+// Scan physical key states and update CHIP-8 keypad
 void keypad_scan(Chip8 *chip8);
 
-// Map the key states into the Chip8 keypad array (keypad[16])
+// Update the key state array for a specific key
 void keypad_map(Chip8 *chip8, uint8_t key, bool state);
 
-// Check if a specific key is pressed (returns true if the key is pressed)
+// Check whether a key is currently pressed
 bool is_key_pressed(Chip8 *chip8, uint8_t key);
 
 #endif

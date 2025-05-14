@@ -2,25 +2,25 @@
 #define TIMER_H
 
 #include "chip8.h"
-#include <SDL.h>
-// Initialize the timers (set both timers to 0)
+#include <stdint.h>
+
+// Set delay and sound timers to 0
 void timer_init(Chip8 *chip8);
 
-// Update the timers (decrement timers at 60Hz)
+// Decrement delay/sound timers at 60Hz (if > 0)
 void timer_update(Chip8 *chip8);
 
-// Get the current delay timer value
+// Accessor functions for the delay and sound timers
 uint8_t get_delay_timer(Chip8 *chip8);
-
-// Get the current sound timer value
 uint8_t get_sound_timer(Chip8 *chip8);
 
-// Set the delay timer value
+// Set the delay or sound timers manually
 void set_delay_timer(Chip8 *chip8, uint8_t value);
-
-// Set the sound timer value
 void set_sound_timer(Chip8 *chip8, uint8_t value);
-void audio_callback(void *userdata, Uint8 *stream, int len);
-void audio_init();
-void audio_quit();
+
+// SDL audio integration (optional)
+void audio_callback(void *userdata, uint8_t *stream, int len);
+void audio_init();    // Start audio engine
+void audio_quit();    // Stop audio engine
+
 #endif

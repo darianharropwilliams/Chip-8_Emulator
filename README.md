@@ -1,6 +1,6 @@
-# CHIP-8 Emulator — Modular, Testable, Web-Ready
+# CHIP-8 Emulator — Modular, Testable, Web-Compatible
 
-This project is a **feature-complete CHIP-8 emulator** written in **pure C** with **zero external dependencies except SDL2**, designed with **testability**, **modular dispatching**, and **browser deployment** in mind.
+This project is a **feature-complete CHIP-8 emulator** written in **pure C**, designed with **testability**, **modular dispatching**, and **browser deployment** in mind.
 
 It goes beyond basic emulation to offer:
 
@@ -8,12 +8,12 @@ It goes beyond basic emulation to offer:
 - A **multi-level opcode dispatch system** for readable instruction handling  
 - **SDL2-based graphics/input** abstractions for native execution  
 - **Test mode** with memory dumps, instruction tracing, and fixture support  
-- Future-ready architecture for **WebAssembly (WASM)** deployment  
+- A working **WebAssembly (WASM)** build with real-time canvas rendering and JS bindings  
+
 
 ---
 
 ## Project Layout
-
 ```
 CHIP-8/
 ├── disasm/         # ROM disassembly reference
@@ -24,7 +24,6 @@ CHIP-8/
 ├── tests/          # C + Python testing suite (test ROMs, dumps, assertions)
 └── Makefile        # One-line build setup
 ```
-
 ---
 
 ## Architecture Deep Dive
@@ -72,33 +71,40 @@ Each table routes to clearly named functions like `op_8xy4()` or `op_Fx1E()` for
 
 ## Display Module (`display.c`)
 
-- Uses **SDL2** to render the 64×32 framebuffer
-- Each pixel scaled (default: `10x`) for modern screens
-- Sprites drawn using XOR logic (with VF collision detection)
-- Wraps around screen edges when sprites overflow
+- Renders the CHIP-8 64×32 framebuffer by delegating to the active platform backend
+- Uses **SDL2** in native builds or **JavaScript canvas** in WASM builds
+- Each pixel is drawn using XOR logic with wraparound and VF collision detection
+- Pixel scaling (default: `10x`) is applied in `platform_sdl.c` for modern screens
 - Functions:
   - `draw_sprite()` — Core draw logic with collision return
-  - `update_display()` — Pushes current buffer to screen
-  - `clear_display()` — Resets the screen
+  - `update_display()` — Triggers `platform_update_display()` for actual rendering
+  - `clear_display()` — Clears framebuffer and marks for redraw
+
+> Rendering is abstracted through `platform_update_display()`, which dynamically selects SDL2 or JS/WASM based on build target.
+
 
 ---
 
 ## Input Module (`input.c`)
 
-- Maps SDL scancodes to 16-key CHIP-8 keypad
-- Polls keys via `SDL_GetKeyboardState()`
+- Maps input to the 16-key CHIP-8 keypad using the platform layer
+- Uses `SDL_GetKeyboardState()` on native platforms or `Module.keyState[]` in WASM
 - Supports:
-  - `keypad_scan()` — Update key states every frame
-  - `keypad_map()` — Manually map keys (future WASM hook)
-  - `is_key_pressed()` — For conditionals and `Fx0A` opcode
+  - `keypad_scan()` — Calls `platform_poll_input()` to update the key state array
+  - `keypad_map()` — Sets individual key states manually (WASM-compatible)
+  - `is_key_pressed()` — For conditional branching and the `Fx0A` blocking wait
 
-Layout:
+> All input is routed through `platform_poll_input()`, which delegates to SDL2 or Emscripten depending on the platform.
+
+
 ```
+Layout:
 1 2 3 C      →    1 2 3 4
 4 5 6 D      →    Q W E R
 7 8 9 E      →    A S D F
 A 0 B F      →    Z X C V
 ```
+
 
 ---
 
@@ -141,16 +147,16 @@ A 0 B F      →    Z X C V
 
 Here’s why this emulator stands out from the crowd:
 
-| Feature | Description |
-|--------|-------------|
-| **Modular Opcode Dispatch** | Multi-table architecture promotes clarity and scalability |
-| **Test Harness Integration** | Python + C testing pipeline with fixture dumps |
-| **Debug Infrastructure** | `DEBUG_PRINT()` macros gated by `test_mode` |
-| **Separation of Concerns** | Each subsystem — input, display, timing, memory — is isolated |
-| **Cycle-accurate Emulation** | Full support for instruction set and timer resolution |
-| **WASM-Ready** | Platform-agnostic VM core, with plans for `platform_wasm.c` |
-| **Memory Safety Aware** | Bounds checks on stack, memory, and I register usage |
-| **Real-time Feedback** | Sprite collisions, timer warnings, and overflow logs built-in |
+| Feature                    | Description                                                  |
+|---------------------------|--------------------------------------------------------------|
+| **Modular Opcode Dispatch**    | Multi-table architecture promotes clarity and scalability     |
+| **Test Harness Integration**  | Python + C testing pipeline with fixture dumps                |
+| **Debug Infrastructure**      | `DEBUG_PRINT()` macros gated by `test_mode`                   |
+| **Separation of Concerns**    | Each subsystem — input, display, timing, memory — is isolated |
+| **Cycle-accurate Emulation**  | Full support for instruction set and timer resolution         |
+| **WASM-Ready**                | Platform-agnostic VM core, with `platform_wasm.c` support      |
+| **Memory Safety Aware**       | Bounds checks on stack, memory, and I register usage          |
+| **Real-time Feedback**        | Sprite collisions, timer warnings, and overflow logs built-in |
 
 ---
 
@@ -162,23 +168,30 @@ Here’s why this emulator stands out from the crowd:
 - Swap `fprintf()` with `assert()` where appropriate
 - Add comprehensive instruction unit tests
 
-### Planned
-- WASM version for browser embedding
-- Instruction coverage profiler
-- Opcode trace visualizer
-- Basic audio beep support when `sound_timer > 0`
-
 ---
 
-## WASM Deployment Plans
+## WebAssembly Support
 
-This emulator is being built with **web deployment in mind**.
+This emulator runs natively **in the browser** via a working WebAssembly build, powered by Emscripten.
 
-### Changes planned:
-- Replace SDL with `platform_*.c` abstraction layer
-- Use `log_error()` to replace `fprintf()` in browser builds
-- Expose `chip8_cycle()`, `chip8_load_rom()` via JS
-- Embed live emulator into personal portfolio site
+### Features
+- Fully functional `platform_wasm.c` backend for display, input, and sound
+- JavaScript bindings to `wasm_init()`, `wasm_cycle()`, and `wasm_load_rom()` via `wasm_bindings.c`
+- Memory-safe ROM loading and rendering
+- Clean canvas-based display via `Module.renderToCanvas(display)`
+- Keyboard input mapped to the CHIP-8 keypad via `Module.keyState[]`
+- Beep support stubbed via `Module.toggleBeep(true/false)`
+
+### Integration Example
+The WASM version is suitable for:
+- Portfolio embedding
+- In-browser ROM debugging
+- Live demos and web-based regression test harnesses
+
+To run:
+1. Build with `emcc` using your Makefile or `.sh` script
+2. Serve with any static web server
+3. Load a ROM using JavaScript and call `wasm_load_rom()`, then `wasm_cycle()` per frame
 
 ---
 
@@ -191,3 +204,5 @@ This project is currently unlicensed. Use the structure, code, or test infrastru
 ## Author Notes
 
 This project was built as a **systems-level showcase** — combining low-level memory manipulation, graphics handling, input polling, and CPU emulation — all while remaining modular, portable, and *fun*.
+
+If you're a recruiter or engineer reviewing this, feel free to explore the opcode handlers, test framework, or platform abstractions. Feedback is welcome, and contributions are open to all who want to tinker with classic emulation.
