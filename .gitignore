@@ -59,3 +59,9 @@ lib/
 *.wasm
 
 platform/wasm/chip8.js
+platform/wasm/chip8.wasm
+tests/python/tests/*
+*/disasm/*
+*/dumps/*
+*/fixtures/*
+*/__pycache__/*

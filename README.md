@@ -62,7 +62,6 @@ CHIP-8/
 │   ├── sdl/       # SDL2 rendering/audio/input backend
 │   └── wasm/      # Emscripten bindings and JS platform glue
 ├── tests/         # C and Python test harnesses
-├── fixtures/      # Mini test ROMs for validation
 ├── roms/          # Public domain CHIP-8 games
 ├── docs/          # Internal developer documentation
 ├── Makefile       # Native (SDL2) build
@@ -115,6 +114,7 @@ See the `docs/` folder for detailed breakdowns:
 - `docs/display.md`: Framebuffer and rendering flow
 - `docs/input.md`: Key mapping and polling abstraction
 - `docs/timer.md`: 60Hz timers and audio integration
+- `docs/utils.md`: Memory operations, endianness checks, debugging output
 - `docs/platform.md`: SDL2 and WASM runtime differences
 - `docs/testing.md`: Test harness, dumps, and validation tools
 
