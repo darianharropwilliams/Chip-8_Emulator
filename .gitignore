@@ -61,7 +61,7 @@ lib/
 platform/wasm/chip8.js
 platform/wasm/chip8.wasm
 tests/python/tests/*
-*/disasm/*
-*/dumps/*
-*/fixtures/*
-*/__pycache__/*
+/tests/python/fixtures/
+/tests/python/disasm/
+/tests/python/dumps/
+/tests/python/__pycache__/
