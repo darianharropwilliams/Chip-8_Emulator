@@ -43,6 +43,7 @@ static const SDL_Scancode keymap[KEYPAD_SIZE] = {
  * Initialize SDL subsystems and create window/renderer.
  */
 void platform_init(void) {
+    SDL_setenv("SDL_AUDIODRIVER", "directsound", 1);  // Force DirectSound
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
         fprintf(stderr, "[SDL] Initialization failed: %s\n", SDL_GetError());
         exit(1);

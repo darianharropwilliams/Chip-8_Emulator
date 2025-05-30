@@ -55,7 +55,7 @@ lib/
 
 
 .vscode/
-/Makefile
-/platform/wasm/Makefile
 /platform/wasm/build.bat
+*.wasm
 
+platform/wasm/chip8.js

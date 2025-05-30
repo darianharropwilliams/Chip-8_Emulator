@@ -1,16 +1,29 @@
+/**
+ * display.c
+ *
+ * CHIP-8 Display Module
+ *
+ * Handles the virtual framebuffer, drawing operations, and display backend
+ * integration (SDL or WebAssembly). Implements the rendering behavior
+ * of CHIP-8 as specified in the instruction set.
+ */
+
 #include "display.h"
 #include "utils.h"
 #include "platform.h"
 #include <string.h>
 
-#define SCALE 10  // Still used internally in some contexts (e.g. SDL)
+#define SCALE 10  // Used internally for resolution scaling (e.g., SDL)
 
-// ----------------------------------------------------------
-// Initializes the display system:
-// - Clears the framebuffer
-// - Sets draw_flag so the screen gets redrawn
-// - Initializes the underlying platform layer (SDL or WASM)
-// ----------------------------------------------------------
+ /**
+  * Initialize the display system.
+  *
+  * - Clears the framebuffer.
+  * - Sets the draw flag to force a redraw.
+  * - Initializes platform-specific rendering backend (SDL, WASM, etc.).
+  *
+  * @param chip8 Pointer to the CHIP-8 emulator instance.
+  */
 void display_init(Chip8 *chip8) {
     if (!chip8) {
         DEBUG_PRINT(chip8, "display_init called on null Chip8 pointer\n");
@@ -18,15 +31,21 @@ void display_init(Chip8 *chip8) {
     }
 
     memset(chip8->display, 0, sizeof(chip8->display));  // Clear framebuffer
-    chip8->draw_flag = true;                            // Mark screen for update
+    chip8->draw_flag = true;                            // Flag for initial redraw
 
-    platform_init();  // Initialize SDL or WASM display backend
+    platform_init();  // Initialize SDL/WASM rendering backend
 }
 
-// ----------------------------------------------------------
-// Clears the CHIP-8 framebuffer and triggers a redraw.
-// This is typically used by the CLS (0x00E0) opcode.
-// ----------------------------------------------------------
+/**
+ * Clear the display.
+ *
+ * - Resets all pixels in the framebuffer.
+ * - Sets the draw flag so the display updates on the next frame.
+ *
+ * Typically invoked by opcode 0x00E0 (CLS).
+ *
+ * @param chip8 Pointer to the CHIP-8 emulator instance.
+ */
 void clear_display(Chip8 *chip8) {
     if (!chip8) {
         DEBUG_PRINT(chip8, "clear_display called on null Chip8 pointer\n");
@@ -34,18 +53,25 @@ void clear_display(Chip8 *chip8) {
     }
 
     memset(chip8->display, 0, sizeof(chip8->display));  // Set all pixels to 0
-    chip8->draw_flag = true;                            // Request a redraw
+    chip8->draw_flag = true;                            // Request display refresh
 }
 
-// ----------------------------------------------------------
-// Draws a sprite at (x, y) with a height of N bytes.
-// Each sprite byte represents 8 horizontal pixels.
-// Pixels are XORed onto the screen, and if any pixels are
-// erased (from 1 to 0), the function returns 1 to indicate
-// a collision, as per CHIP-8 spec (VF gets set accordingly).
-//
-// Sprite wrapping is handled using modulo on coordinates.
-// ----------------------------------------------------------
+/**
+ * Draw a sprite to the screen using XOR rendering.
+ *
+ * Each byte of the sprite corresponds to one horizontal row of 8 pixels.
+ * If any drawn pixel flips from 1 to 0 (collision), this function returns 1.
+ * Otherwise, returns 0.
+ *
+ * Wrapping occurs automatically if the sprite exceeds screen boundaries.
+ *
+ * @param chip8  Pointer to the CHIP-8 emulator instance.
+ * @param x      Horizontal position (Vx).
+ * @param y      Vertical position (Vy).
+ * @param height Number of bytes (rows) to draw.
+ * @param sprite Pointer to sprite data in memory.
+ * @return       1 if any pixel was unset (collision), 0 otherwise.
+ */
 int draw_sprite(Chip8 *chip8, uint8_t x, uint8_t y, uint8_t height, const uint8_t *sprite) {
     if (!chip8) {
         DEBUG_PRINT(chip8, "draw_sprite called on null Chip8 pointer\n");
@@ -63,16 +89,16 @@ int draw_sprite(Chip8 *chip8, uint8_t x, uint8_t y, uint8_t height, const uint8_
         uint8_t sprite_byte = sprite[row];
 
         for (uint8_t col = 0; col < 8; ++col) {
-            // If bit is set, process the pixel
+            // Check if this bit should be drawn
             if ((sprite_byte & (0x80 >> col)) != 0) {
                 uint8_t px = (x + col) % DISPLAY_WIDTH;
                 uint8_t py = (y + row) % DISPLAY_HEIGHT;
                 uint16_t index = py * DISPLAY_WIDTH + px;
 
                 if (chip8->display[index] == 1)
-                    collision = 1;  // Sprite pixel collided with existing pixel
+                    collision = 1;  // Erasing an existing pixel
 
-                chip8->display[index] ^= 1;  // XOR toggle
+                chip8->display[index] ^= 1;  // Toggle pixel using XOR
             }
         }
     }
@@ -80,22 +106,28 @@ int draw_sprite(Chip8 *chip8, uint8_t x, uint8_t y, uint8_t height, const uint8_
     return collision;
 }
 
-// ----------------------------------------------------------
-// Sends the current framebuffer to the screen using the platform layer.
-// This should be called when draw_flag is true.
-// ----------------------------------------------------------
+/**
+ * Update the physical display.
+ *
+ * Delegates to platform-specific rendering to copy the framebuffer
+ * contents to the screen. Should only be called when draw_flag is set.
+ *
+ * @param chip8 Pointer to the CHIP-8 emulator instance.
+ */
 void update_display(Chip8 *chip8) {
     if (!chip8) {
         DEBUG_PRINT(chip8, "update_display called on null Chip8 pointer\n");
         return;
     }
 
-    platform_update_display(chip8->display);  // Backend-specific draw call
+    platform_update_display(chip8->display);  // Delegate to SDL or Web backend
 }
 
-// ----------------------------------------------------------
-// Shut down display resources (e.g. SDL window and renderer).
-// ----------------------------------------------------------
+/**
+ * Shutdown and clean up display resources.
+ *
+ * Destroys SDL window and renderer or equivalent platform components.
+ */
 void display_quit() {
-    platform_quit();  // Cleanup handled by SDL or WASM
+    platform_quit();  // Cleanup handled by platform backend
 }

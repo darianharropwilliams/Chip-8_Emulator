@@ -1,4 +1,15 @@
-// chip8.c
+/**
+ * chip8.c
+ *
+ * Core logic for initializing and running the CHIP-8 virtual machine.
+ * This module handles:
+ * - Memory and register setup
+ * - Fontset loading
+ * - Subsystem initialization (display, timers, input)
+ * - ROM loading
+ * - Fetch-decode-execute cycle
+ */
+
 #include "chip8.h"
 #include "dispatch.h"
 #include "input.h"
@@ -8,11 +19,11 @@
 #include <stdio.h>
 #include <string.h>
 
-// ----------------------------------------------------------
-// Built-in CHIP-8 fontset for hexadecimal digits (0–F).
-// Each character is 5 bytes tall, stored as bitmapped rows.
-// These are typically loaded into memory starting at address 0x000.
-// ----------------------------------------------------------
+/**
+ * Built-in CHIP-8 fontset (0–F).
+ * Each character is 5 bytes tall, representing 4x5 pixel sprites.
+ * Stored in memory starting at address 0x000.
+ */
 static const uint8_t fontset[80] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -33,51 +44,54 @@ static const uint8_t fontset[80] = {
 };
 
 /**
- * Initialize the CHIP-8 virtual machine.
- * Clears memory and registers, sets PC to 0x200,
- * loads fontset, and initializes subsystems.
+ * Initializes a CHIP-8 instance.
+ * Clears memory, resets registers and timers, and prepares subsystems.
+ *
+ * @param chip8 Pointer to the Chip8 structure to initialize.
  */
 void chip8_init(Chip8 *chip8) {
-    // Zero the entire CHIP-8 struct, including memory, registers, etc.
+    // Zero the entire structure (including memory, registers, etc.)
     memset(chip8, 0, sizeof(Chip8));
 
-    // CHIP-8 programs start at memory location 0x200
+    // CHIP-8 programs start at memory address 0x200
     chip8->pc = 0x200;
 
-    // Initialize subsystems
+    // Initialize display, timers, and keypad subsystems
     display_init(chip8);
     timer_init(chip8);
     keypad_init(chip8);
 
-    // Load fontset into the first 80 bytes of memory
+    // Load the fontset into the beginning of memory (0x000–0x04F)
     memcpy(chip8->memory, fontset, FONTSET_SIZE);
 
-    // Initialize opcode dispatch tables
+    // Set up opcode dispatch table for instruction decoding
     opcode_dispatch_init();
 }
 
 /**
- * Load a ROM from file into CHIP-8 memory starting at 0x200.
- * Wrapper around the utility function `load_rom`.
+ * Loads a ROM binary into the emulator's memory at address 0x200.
+ * This wraps the generic `load_rom` utility for CHIP-8 semantics.
  *
- * @param chip8 Pointer to CHIP-8 state
- * @param filename Path to ROM file
- * @return 0 on success, -1 on failure
+ * @param chip8    Pointer to the emulator state.
+ * @param filename Path to the ROM file to load.
+ * @return         0 on success, -1 on failure.
  */
 int chip8_load_rom(Chip8 *chip8, const char *filename) {
-    // Load ROM into memory starting at 0x200
     return load_rom(filename, chip8->memory + 0x200, MEMORY_SIZE);
 }
 
 /**
- * Execute one emulation cycle.
- * This function:
- * - Fetches the next instruction (2 bytes)
- * - Increments the program counter
- * - Decodes and executes the instruction
- * - Updates timers
- * - Scans input
- * - Refreshes display if needed
+ * Executes a single emulation cycle of the CHIP-8 virtual machine.
+ *
+ * This cycle performs the following steps:
+ * - Fetch: Reads the next 2-byte instruction from memory.
+ * - Decode + Execute: Uses the dispatch table to invoke the opcode handler.
+ * - Update: Advances timers and polls input.
+ *
+ * Increments the program counter before execution.
+ * Updates to the display are flagged via `chip8->draw_flag` and handled externally.
+ *
+ * @param chip8 Pointer to the emulator state.
  */
 void chip8_cycle(Chip8 *chip8) {
     if (!chip8) {
@@ -85,36 +99,27 @@ void chip8_cycle(Chip8 *chip8) {
         return;
     }
 
-    // Make sure the program counter is within valid memory bounds
     if (chip8->pc >= MEMORY_SIZE - 1) {
         DEBUG_PRINT(chip8, "PC out of bounds: 0x%04X\n", chip8->pc);
         return;
     }
 
-    // Fetch opcode: two bytes from memory, big-endian
+    // Fetch 16-bit instruction (big-endian)
     uint16_t opcode = (chip8->memory[chip8->pc] << 8) | chip8->memory[chip8->pc + 1];
 
     DEBUG_PRINT_STDOUT(chip8, "[DEBUG] PC=0x%04X  Executing: 0x%04X\n", chip8->pc, opcode);
 
-    // Increment PC before execution (each instruction is 2 bytes)
+    // Advance PC before executing (some handlers may override it)
     chip8->pc += 2;
 
-    // Decode and execute the opcode
+    // Decode and execute instruction
     if (!dispatch_opcode(chip8, opcode)) {
         DEBUG_PRINT(chip8, "Registers after unknown opcode:\n");
-        // Optionally print state or halt
-        // print_registers(chip8->V, chip8->I, chip8->pc, chip8->delay_timer, chip8->sound_timer);
     }
 
-    // Update timers (run at 60Hz)
+    // Timers and input are updated after each instruction
     timer_update(chip8);
-
-    // Poll for key inputs
     keypad_scan(chip8);
 
-    // If a draw was requested by the last instruction, refresh the display
-    if (chip8->draw_flag) {
-        update_display(chip8);
-        chip8->draw_flag = false;  // Reset flag after drawing
-    }
+    // draw_flag is checked and acted on externally in the main loop
 }

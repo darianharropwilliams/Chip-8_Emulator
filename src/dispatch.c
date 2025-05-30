@@ -1,28 +1,44 @@
+/**
+ * dispatch.c
+ *
+ * CHIP-8 opcode dispatch system.
+ *
+ * This module routes 16-bit CHIP-8 opcodes to the correct handler functions
+ * using multi-level dispatch tables. It supports direct decoding of opcodes
+ * and layered subdispatching for complex instruction groups (e.g., 0x8, 0xF).
+ */
+
 #include "chip8.h"
-#include <stdio.h>
-#include <string.h>
 #include "dispatch.h"
 #include "opcodes.h"
-
-// Duplicate typedef for opcode function pointer, ensures compatibility with IntelliSense or code tools
-typedef void (*OpcodeHandler)(Chip8 *chip8, uint16_t opcode);
-
-// -----------------------------------------------------------------------------
-// Dispatch Tables: Used to route opcodes to their correct handler functions
-// -----------------------------------------------------------------------------
-
-// Main dispatch table: uses the highest nibble (4 bits) of the opcode
-static OpcodeHandler main_table[0x10];
-
-// Sub-dispatch tables used for opcodes that need deeper decoding
-static OpcodeHandler table_0[0x100]; // For opcodes 0x00E0 and 0x00EE
-static OpcodeHandler table_8[0x10];  // For opcodes 0x8xy* (bitwise and arithmetic)
-static OpcodeHandler table_E[0x100]; // For opcodes 0xEx9E and 0xExA1
-static OpcodeHandler table_F[0x100]; // For opcodes 0xFx** (timer, memory, etc.)
+#include <stdio.h>
+#include <string.h>
 
 /**
- * Initialize all dispatch tables with the appropriate opcode handlers.
- * Sets up the routing logic for both standard and extended opcode groups.
+ * Typedef for opcode handler functions.
+ * All opcode handlers take a Chip8 pointer and the 16-bit opcode.
+ */
+typedef void (*OpcodeHandler)(Chip8 *chip8, uint16_t opcode);
+
+/* ------------------------------------------------------------
+ * Primary Dispatch Tables
+ * ------------------------------------------------------------
+ * main_table — routes based on top nibble (0x0 to 0xF)
+ * table_0    — routes 0x00** opcodes (e.g., CLS, RET)
+ * table_8    — routes 0x8xy* ALU instructions
+ * table_E    — routes 0xEx** key input ops
+ * table_F    — routes 0xFx** timers, memory, and I/O
+ */
+
+static OpcodeHandler main_table[0x10];
+static OpcodeHandler table_0[0x100];
+static OpcodeHandler table_8[0x10];
+static OpcodeHandler table_E[0x100];
+static OpcodeHandler table_F[0x100];
+
+/**
+ * Initializes the opcode dispatch tables.
+ * Maps each opcode group to its corresponding handler.
  */
 void opcode_dispatch_init(void) {
     // Clear all dispatch tables
@@ -32,61 +48,61 @@ void opcode_dispatch_init(void) {
     memset(table_E, 0, sizeof(table_E));
     memset(table_F, 0, sizeof(table_F));
 
-    // Primary 4-bit opcode dispatch (0x0 to 0xF)
-    main_table[0x0] = op_0xxx;  // SYS instructions → further dispatched
-    main_table[0x1] = op_1nnn;  // JP addr
-    main_table[0x2] = op_2nnn;  // CALL addr
-    main_table[0x3] = op_3xkk;  // SE Vx, byte
-    main_table[0x4] = op_4xkk;  // SNE Vx, byte
-    main_table[0x5] = op_5xy0;  // SE Vx, Vy
-    main_table[0x6] = op_6xkk;  // LD Vx, byte
-    main_table[0x7] = op_7xkk;  // ADD Vx, byte
-    main_table[0x8] = op_8xxx;  // ALU ops → further dispatched
-    main_table[0x9] = op_9xy0;  // SNE Vx, Vy
-    main_table[0xA] = op_Annn;  // LD I, addr
-    main_table[0xB] = op_Bnnn;  // JP V0, addr
-    main_table[0xC] = op_Cxkk;  // RND Vx, byte
-    main_table[0xD] = op_Dxyn;  // DRW Vx, Vy, nibble
-    main_table[0xE] = op_Exxx;  // Key input → further dispatched
-    main_table[0xF] = op_Fxxx;  // Misc → further dispatched
+    // Main table — top nibble (0x0 to 0xF)
+    main_table[0x0] = op_0xxx;
+    main_table[0x1] = op_1nnn;
+    main_table[0x2] = op_2nnn;
+    main_table[0x3] = op_3xkk;
+    main_table[0x4] = op_4xkk;
+    main_table[0x5] = op_5xy0;
+    main_table[0x6] = op_6xkk;
+    main_table[0x7] = op_7xkk;
+    main_table[0x8] = op_8xxx;
+    main_table[0x9] = op_9xy0;
+    main_table[0xA] = op_Annn;
+    main_table[0xB] = op_Bnnn;
+    main_table[0xC] = op_Cxkk;
+    main_table[0xD] = op_Dxyn;
+    main_table[0xE] = op_Exxx;
+    main_table[0xF] = op_Fxxx;
 
-    // Subdispatch table for 0x0 group
-    table_0[0xE0] = op_00E0;    // CLS (clear display)
-    table_0[0xEE] = op_00EE;    // RET (return from subroutine)
+    // Subtable: 0x0***
+    table_0[0xE0] = op_00E0; // CLS
+    table_0[0xEE] = op_00EE; // RET
 
-    // Subdispatch table for 0x8 group
-    table_8[0x0] = op_8xy0;     // LD Vx, Vy
-    table_8[0x1] = op_8xy1;     // OR Vx, Vy
-    table_8[0x2] = op_8xy2;     // AND Vx, Vy
-    table_8[0x3] = op_8xy3;     // XOR Vx, Vy
-    table_8[0x4] = op_8xy4;     // ADD Vx, Vy (with carry)
-    table_8[0x5] = op_8xy5;     // SUB Vx, Vy
-    table_8[0x6] = op_8xy6;     // SHR Vx
-    table_8[0x7] = op_8xy7;     // SUBN Vx, Vy
-    table_8[0xE] = op_8xyE;     // SHL Vx
+    // Subtable: 0x8***
+    table_8[0x0] = op_8xy0;
+    table_8[0x1] = op_8xy1;
+    table_8[0x2] = op_8xy2;
+    table_8[0x3] = op_8xy3;
+    table_8[0x4] = op_8xy4;
+    table_8[0x5] = op_8xy5;
+    table_8[0x6] = op_8xy6;
+    table_8[0x7] = op_8xy7;
+    table_8[0xE] = op_8xyE;
 
-    // Subdispatch table for 0xE group (key input)
-    table_E[0x9E] = op_Ex9E;    // SKP Vx
-    table_E[0xA1] = op_ExA1;    // SKNP Vx
+    // Subtable: 0xE***
+    table_E[0x9E] = op_Ex9E; // SKP Vx
+    table_E[0xA1] = op_ExA1; // SKNP Vx
 
-    // Subdispatch table for 0xF group (timers, memory, etc.)
-    table_F[0x07] = op_Fx07;   // LD Vx, DT
-    table_F[0x0A] = op_Fx0A;   // LD Vx, K
-    table_F[0x15] = op_Fx15;   // LD DT, Vx
-    table_F[0x18] = op_Fx18;   // LD ST, Vx
-    table_F[0x1E] = op_Fx1E;   // ADD I, Vx
-    table_F[0x29] = op_Fx29;   // LD F, Vx
-    table_F[0x33] = op_Fx33;   // LD B, Vx
-    table_F[0x55] = op_Fx55;   // LD [I], Vx
-    table_F[0x65] = op_Fx65;   // LD Vx, [I]
+    // Subtable: 0xF***
+    table_F[0x07] = op_Fx07;
+    table_F[0x0A] = op_Fx0A;
+    table_F[0x15] = op_Fx15;
+    table_F[0x18] = op_Fx18;
+    table_F[0x1E] = op_Fx1E;
+    table_F[0x29] = op_Fx29;
+    table_F[0x33] = op_Fx33;
+    table_F[0x55] = op_Fx55;
+    table_F[0x65] = op_Fx65;
 }
 
 /**
- * Decode a CHIP-8 opcode and dispatch it to the correct handler.
+ * Dispatches a single CHIP-8 opcode to its corresponding handler function.
  *
- * @param chip8 Pointer to CHIP-8 state
- * @param opcode 16-bit opcode fetched from memory
- * @return true if successfully dispatched; false if unknown
+ * @param chip8  Pointer to the CHIP-8 emulator state.
+ * @param opcode The 16-bit opcode to execute.
+ * @return       true if the opcode was dispatched; false if unknown.
  */
 bool dispatch_opcode(Chip8 *chip8, uint16_t opcode) {
     if (!chip8) {
@@ -94,12 +110,12 @@ bool dispatch_opcode(Chip8 *chip8, uint16_t opcode) {
         return false;
     }
 
-    // Use top 4 bits of opcode as index into main dispatch table
+    // Use top nibble to find main group handler
     uint8_t prefix = (opcode >> 12) & 0xF;
     OpcodeHandler opcode_function = main_table[prefix];
 
-    if (opcode_function != NULL) {
-        opcode_function(chip8, opcode);  // Call the handler
+    if (opcode_function) {
+        opcode_function(chip8, opcode);
         return true;
     } else {
         fprintf(stderr, "Unknown Opcode: 0x%04X\n", opcode);
@@ -107,54 +123,73 @@ bool dispatch_opcode(Chip8 *chip8, uint16_t opcode) {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Subdispatch handlers — called from main table for multi-level opcode groups
-// -----------------------------------------------------------------------------
+/* ------------------------------------------------------------
+ * Subdispatchers
+ * ------------------------------------------------------------
+ * These are called from the main table and delegate to subgroups
+ * based on lower bits of the opcode.
+ */
 
 /**
- * Handle 0x0*** opcodes (SYS addr / CLS / RET).
- * Forwards to table_0 using lowest 8 bits.
+ * Handles 0x0*** opcodes (system ops like CLS, RET).
+ * Uses the lowest 8 bits to route within table_0.
+ *
+ * @param chip8  Pointer to CHIP-8 state.
+ * @param opcode Full 16-bit opcode.
  */
 void op_0xxx(Chip8 *chip8, uint16_t opcode) {
     OpcodeHandler handler = table_0[opcode & 0x00FF];
-    if (handler)
+    if (handler) {
         handler(chip8, opcode);
-    else
+    } else {
         fprintf(stderr, "Unknown sub-opcode in 0x0 group: 0x%04X\n", opcode);
+    }
 }
 
 /**
- * Handle 0x8*** opcodes (bitwise and arithmetic).
- * Dispatches based on lowest nibble.
+ * Handles 0x8*** opcodes (arithmetic and bitwise).
+ * Uses lowest nibble to dispatch within table_8.
+ *
+ * @param chip8  Pointer to CHIP-8 state.
+ * @param opcode Full 16-bit opcode.
  */
 void op_8xxx(Chip8 *chip8, uint16_t opcode) {
     OpcodeHandler handler = table_8[opcode & 0x000F];
-    if (handler)
+    if (handler) {
         handler(chip8, opcode);
-    else
+    } else {
         fprintf(stderr, "Unknown sub-opcode in 0x8 group: 0x%04X\n", opcode);
+    }
 }
 
 /**
- * Handle 0xE*** opcodes (keyboard skip instructions).
- * Dispatches based on lowest 8 bits.
+ * Handles 0xE*** opcodes (key press skips).
+ * Uses lowest byte for dispatching within table_E.
+ *
+ * @param chip8  Pointer to CHIP-8 state.
+ * @param opcode Full 16-bit opcode.
  */
 void op_Exxx(Chip8 *chip8, uint16_t opcode) {
     OpcodeHandler handler = table_E[opcode & 0x00FF];
-    if (handler)
+    if (handler) {
         handler(chip8, opcode);
-    else
+    } else {
         fprintf(stderr, "Unknown sub-opcode in 0xE group: 0x%04X\n", opcode);
+    }
 }
 
 /**
- * Handle 0xF*** opcodes (miscellaneous: timers, memory, input).
- * Dispatches based on lowest 8 bits.
+ * Handles 0xF*** opcodes (miscellaneous instructions).
+ * Uses lowest byte for dispatching within table_F.
+ *
+ * @param chip8  Pointer to CHIP-8 state.
+ * @param opcode Full 16-bit opcode.
  */
 void op_Fxxx(Chip8 *chip8, uint16_t opcode) {
     OpcodeHandler handler = table_F[opcode & 0x00FF];
-    if (handler)
+    if (handler) {
         handler(chip8, opcode);
-    else
+    } else {
         fprintf(stderr, "Unknown sub-opcode in 0xF group: 0x%04X\n", opcode);
+    }
 }

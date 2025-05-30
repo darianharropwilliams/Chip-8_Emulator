@@ -1,48 +1,61 @@
+/**
+ * main.c
+ *
+ * Entry point for the CHIP-8 emulator.
+ * Supports both interactive and test-mode execution.
+ *
+ * In interactive mode, a ROM is executed in a 60 FPS loop using SDL2.
+ * In test mode, the emulator runs a limited number of cycles and exits after a RET instruction.
+ *
+ * Usage:
+ *     chip8 <ROM file> [--test]
+ */
+
 #include <stdlib.h>
 #include <time.h>
 #include <signal.h>
 #include <unistd.h>
 #include <string.h>
-#include <libgen.h>  // for basename()
+#include <libgen.h>
+#include <SDL_stdinc.h>
+#include <SDL_timer.h>
 
 #include "chip8.h"
 #include "utils.h"
 #include "platform.h"
 #include "display.h"
 
-// Global CHIP-8 system instance
+// Global CHIP-8 VM instance
 Chip8 chip8;
 
-// Flag for graceful shutdown triggered by SIGINT (Ctrl+C)
+// Signal-safe flag to support graceful shutdown on SIGINT
 volatile sig_atomic_t quit_requested = 0;
 
 /**
  * Signal handler for SIGINT (Ctrl+C).
- * Sets the quit_requested flag and writes a message to stderr.
+ * Sets a flag to allow the main loop to terminate gracefully.
  */
 void handle_signal(int signal) {
     const char msg[] = "\nCaught signal. Exiting cleanly...\n";
-    write(STDERR_FILENO, msg, sizeof(msg) - 1);  // Safe in signal context
+    write(STDERR_FILENO, msg, sizeof(msg) - 1);
     quit_requested = 1;
 }
 
 #ifdef __EMSCRIPTEN__
 /**
- * Entry point for WebAssembly build.
- * Emscripten uses a standard `main` function.
+ * Emscripten entry point (browser-based builds).
  */
 int main(int argc, char *argv[])
 #else
 /**
- * Entry point for native SDL builds (SDL hijacks `main()`).
+ * SDL-based entry point (native desktop).
  */
 int SDL_main(int argc, char *argv[])
 #endif
 {
     bool test_mode = false;
 
-    // Parse command line args
-    // Expected usage: ./emulator <ROM file> [--test]
+    // Parse command-line arguments
     if (argc == 3 && strcmp(argv[2], "--test") == 0) {
         test_mode = true;
     } else if (argc != 2) {
@@ -50,34 +63,41 @@ int SDL_main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    // Initialize emulator state
     chip8_init(&chip8);
 
-    // Enable test mode inside the CHIP-8 state
-    if (argc >= 3 && strcmp(argv[2], "--test") == 0) {
+    // Enable test mode (used to trigger test_halt() on RET)
+    if (test_mode) {
         chip8.test_mode = true;
     }
 
-    // Save ROM path in case test features need to reference it later (e.g., memory dump)
+    // Store ROM path (used for dumping results in test mode)
     strncpy(chip8.rom_path, argv[1], sizeof(chip8.rom_path) - 1);
-    chip8.rom_path[sizeof(chip8.rom_path) - 1] = '\0';  // Ensure null termination
+    chip8.rom_path[sizeof(chip8.rom_path) - 1] = '\0';
 
-    // Load the ROM into memory at 0x200
+    // Load the ROM into memory starting at 0x200
     if (chip8_load_rom(&chip8, argv[1])) {
         fprintf(stderr, "Failed to load ROM: %s\n", argv[1]);
         return EXIT_FAILURE;
     }
 
-    // Register SIGINT handler (Ctrl+C)
+    // Register signal handler for graceful termination
     if (signal(SIGINT, handle_signal) == SIG_ERR) {
         fprintf(stderr, "Failed to register SIGINT handler\n");
         return EXIT_FAILURE;
     }
 
-    // If in test mode, run a fixed number of frames at a stable rate
+    /**
+     * -------------------
+     * TEST MODE EXECUTION
+     * -------------------
+     * Executes a fixed number of frames and relies on RET to call test_halt(),
+     * which writes a binary dump and exits. This path is used for automated testing.
+     */
     if (test_mode) {
-        const int CYCLES_PER_FRAME = 60;     // Execute 60 CHIP-8 cycles per frame
-        const int FRAME_DELAY_MS = 1000 / 60; // Target 60 FPS
-        const int TEST_FRAMES = 10;           // Total number of test frames to run
+        const int CYCLES_PER_FRAME = 10;
+        const int FRAME_DELAY_MS = 1000 / 60;
+        const int TEST_FRAMES = 10;
 
         for (int frame = 0; frame < TEST_FRAMES && !quit_requested; frame++) {
             clock_t start = clock();
@@ -86,10 +106,10 @@ int SDL_main(int argc, char *argv[])
                 chip8_cycle(&chip8);
             }
 
-            // Wait to maintain stable frame rate
             clock_t end = clock();
             int elapsed_ms = (int)((end - start) * 1000 / CLOCKS_PER_SEC);
 
+            // Frame pacing to simulate ~60Hz
             if (elapsed_ms < FRAME_DELAY_MS) {
                 struct timespec ts = {
                     .tv_sec = 0,
@@ -99,17 +119,53 @@ int SDL_main(int argc, char *argv[])
             }
         }
 
+        // Clean shutdown after test run
         display_quit();
         return EXIT_SUCCESS;
     }
 
-    // Normal execution mode — continuous, fast loop
+#ifndef __EMSCRIPTEN__
+    /**
+     * ------------------------
+     * INTERACTIVE MODE EXECUTION
+     * ------------------------
+     * Main event loop that runs continuously, cycling the VM and updating display.
+     * Timed to simulate ~700 instructions per second.
+     */
+    const int CYCLES_PER_SECOND = 700;
+    const int FRAME_RATE = 60;
+    const int CYCLES_PER_FRAME = CYCLES_PER_SECOND / FRAME_RATE;
+
+    Uint32 last_time = SDL_GetTicks();
+    Uint32 accumulator = 0;
+
     while (!quit_requested) {
-        for (int i = 0; i < 100; i++) {
-            chip8_cycle(&chip8);  // Run 100 cycles before checking for exit
+        Uint32 current_time = SDL_GetTicks();
+        Uint32 delta = current_time - last_time;
+        last_time = current_time;
+        accumulator += delta;
+
+        // Run cycles for each frame slice
+        while (accumulator >= (1000 / FRAME_RATE)) {
+            for (int i = 0; i < CYCLES_PER_FRAME; i++) {
+                chip8_cycle(&chip8);
+            }
+
+            if (chip8.draw_flag) {
+                update_display(&chip8);
+                chip8.draw_flag = false;
+            }
+
+            accumulator -= (1000 / FRAME_RATE);
         }
+
+        // Avoid maxing out CPU
+        SDL_Delay(1);
     }
 
-    display_quit();  // Clean shutdown of SDL window and display
+    display_quit();
     return EXIT_SUCCESS;
+#else
+    return EXIT_SUCCESS;
+#endif
 }

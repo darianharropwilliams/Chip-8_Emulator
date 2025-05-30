@@ -1,13 +1,36 @@
+"""
+generate_test_roms.py
+
+Generates a suite of test ROMs for the CHIP-8 emulator and outputs:
+- Binary ROM files into ./fixtures/
+- Disassembled text files into ./disasm/
+
+Each ROM contains a short instruction sequence targeting a specific opcode or feature.
+Test execution begins at address 0x208 via a CALL wrapper from 0x200.
+
+Run this script once to regenerate all test ROMs:
+    $ python generate_test_roms.py
+"""
+
 import os
 
-# Folder to output ROMs and disassemblies
+# Output directories
 OUTPUT_DIR = "./fixtures/"
 DUMP_DIR = "./disasm/"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(DUMP_DIR, exist_ok=True)
 
-# Helper: disassemble a CHIP-8 instruction
-def disassemble(opcode):
+
+def disassemble(opcode: int) -> str:
+    """
+    Returns a human-readable disassembly for a given CHIP-8 opcode.
+
+    Args:
+        opcode: A 16-bit CHIP-8 instruction.
+
+    Returns:
+        A string representing the mnemonic and arguments.
+    """
     nnn = opcode & 0x0FFF
     kk = opcode & 0x00FF
     x = (opcode >> 8) & 0x0F
@@ -53,8 +76,15 @@ def disassemble(opcode):
     else:
         return "UNKNOWN"
 
-# Write ROM file + disassembly
-def write_rom(filename, instructions):
+
+def write_rom(filename: str, instructions: list[int]) -> None:
+    """
+    Write a CHIP-8 ROM and its disassembly to output files.
+
+    Args:
+        filename: The target ROM file name (e.g., "add_vx.rom").
+        instructions: A list of 16-bit CHIP-8 opcodes.
+    """
     path = os.path.join(OUTPUT_DIR, filename)
     disasm_path = os.path.join(DUMP_DIR, filename.replace(".rom", ".txt"))
 
@@ -65,10 +95,20 @@ def write_rom(filename, instructions):
 
     print(f"[Generated] {filename}")
 
-def generate_roms():
+
+def generate_roms() -> None:
+    """
+    Generate all test ROMs with appropriate wrappers for test-mode execution.
+
+    Each ROM includes:
+    - CALL 0x208 at 0x200 (start of program)
+    - NOP padding to reach 0x208
+    - Instruction sequence
+    - RET to exit cleanly from test mode
+    """
     CALL_TEST = 0x2208     # CALL 0x208 — test body starts at 0x208
     TEST_END  = 0x00EE     # RET to exit in test_mode
-    HALT_LOOP = 0x1200     # JP 0x200 — safe halt loop
+    HALT_LOOP = 0x1200     # JP 0x200 — unused here, but useful for manual ROMs
 
     roms_raw = {
         "ld_vx.rom": [0x600A],
@@ -89,16 +129,22 @@ def generate_roms():
         "draw_sprite.rom": [0x6000, 0x6100, 0xA300, 0xD015],
         "key_skip.rom": [0x6005, 0xE09E, 0x60FF],
         "bcd.rom": [0x600F, 0xA300, 0xF033],
-        "timer_set.rom": [0x601E, 0xF015, 0xF018],
+        "timer_set.rom": [0x601E, 0xF015, 0xF018],  # Note: not currently validated due to timing issues
     }
 
     for name, body in roms_raw.items():
+        # Insert CALL wrapper and NOPs (LD V0, 0) until address 0x208
         padding_size = (0x208 - 0x202) // 2
-        wrapper = [0x2208] + [0x6000] * padding_size  # NOPs until 0x208
+        wrapper = [CALL_TEST] + [0x6000] * padding_size
+
         if name == "call_ret.rom":
-            test = body  # no RET added; already included explicitly
+            test = body  # already includes RET
         else:
-            test = body + [TEST_END]
+            test = body + [TEST_END]  # ensure clean return
+
         write_rom(name, wrapper + test)
 
-generate_roms()
+
+# Execute ROM generation if script is run directly
+if __name__ == "__main__":
+    generate_roms()
